@@ -50,6 +50,10 @@ case ${TARGET} in
         UKVM_SYSDEP_OBJS="ukvm_hv_kvm.o ukvm_hv_kvm_x86_64.o ukvm_cpu_x86_64.o"
         UKVM_SYSDEP_HEADERS="ukvm_hv_kvm.h ukvm_cpu_x86_64.h"
         ;;
+    x86_64-*freebsd1[12]*)
+        UKVM_SYSDEP_OBJS="ukvm_hv_bhyve.o ukvm_hv_bhyve_x86_64.o ukvm_cpu_x86_64.o"
+        UKVM_SYSDEP_HEADERS="ukvm_hv_bhyve.h ukvm_cpu_x86_64.h"
+	;;
     *)
         echo "Error: Unsupported compiler target: ${TARGET}" 1>&2
         echo "Error: Using compiler \"${UKVM_CC}\". Set \$UKVM_CC to change it." 1>&2
@@ -66,6 +70,7 @@ UKVM_CFLAGS=-Wall -Werror -std=c99 -O2 -g ${UKVM_MODULE_CFLAGS}
 ifdef UKVM_STATIC
 UKVM_LDFLAGS=-static
 endif
+UKVM_LDLIBS=${UKVM_LDLIBS}
 
 UKVM_OBJS=ukvm_core.o ukvm_elf.o ukvm_main.o ${UKVM_SYSDEP_OBJS} ${UKVM_MODULE_OBJS}
 UKVM_HEADERS=ukvm.h ukvm_guest.h ukvm_cc.h ${UKVM_SYSDEP_HEADERS}
@@ -80,7 +85,7 @@ _build-ukvm/ukvm_%.o: ${UKVM_SRC}/ukvm_%.c \$(MAKEFILE_LIST) | _build-ukvm
 	\$(UKVM_CC) \$(UKVM_CFLAGS) -c \$< -o \$@
 
 ukvm-bin: \$(UKVM_BUILD_OBJS) \$(UKVM_SRC_HEADERS) \$(MAKEFILE_LIST)
-	\$(UKVM_CC) \$(UKVM_LDFLAGS) -o \$@ \$(UKVM_CFLAGS) \$(UKVM_BUILD_OBJS)
+	\$(UKVM_CC) \$(UKVM_LDFLAGS) -o \$@ \$(UKVM_CFLAGS) \$(UKVM_BUILD_OBJS) \$(UKVM_LDLIBS)
 
 .PHONY: ukvm-clean
 ukvm-clean:
