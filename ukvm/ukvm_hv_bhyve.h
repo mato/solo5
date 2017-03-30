@@ -22,6 +22,7 @@
 #define __UKVM_HV_BHYVE_H__
 
 struct ukvm_hvb {
+    char *vmname;
     int vmfd;
     struct vm_run vmrun;
 };

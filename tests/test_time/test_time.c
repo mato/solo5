@@ -20,6 +20,7 @@
 
 #include "solo5.h"
 #include "../../kernel/lib.c"
+#include "../../kernel/ee_printf.c"
 
 static void puts(const char *s)
 {
@@ -54,15 +55,15 @@ int solo5_app_main(char *cmdline __attribute__((unused)))
      * Verify that we did not sleep less than requested (see above).
      */
     if ((tb - ta) < NSEC_PER_SEC) {
-        puts("ERROR: slept too little\n");
+        printf("ERROR: underslept by %lu nsecs\n", NSEC_PER_SEC - (tb - ta));
         return 1;
     }
     /*
      * Verify that we did not sleep more than requested, within reason
      * (scheduling delays, general inaccuracy of the current timing code).
      */
-    if ((tb - ta) > (NSEC_PER_SEC + 20000000ULL)) {
-        puts("ERROR: slept too much\n");
+    if ((tb - ta) > (NSEC_PER_SEC + 100000000ULL)) {
+        printf("ERROR: overslept by %lu nsecs\n", (tb - ta) - NSEC_PER_SEC);
         return 1;
     }
 

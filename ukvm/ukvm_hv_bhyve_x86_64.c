@@ -113,10 +113,19 @@ void ukvm_hv_vcpu_init(struct ukvm_hv *hv, ukvm_gpa_t gpa_ep,
     bi->kernel_end = gpa_kend;
     bi->cmdline = X86_CMDLINE_BASE;
 
-    size_t tmp = sizeof bi->tsc_freq;
-    int ret = sysctlbyname("machdep.tsc_freq", &bi->tsc_freq, &tmp, NULL, 0);
+    size_t outsz = sizeof bi->cpu.tsc_freq;
+    int ret = sysctlbyname("machdep.tsc_freq", &bi->cpu.tsc_freq, &outsz, NULL,
+            0);
     if (ret == -1)
         err(1, "sysctl(machdep.tsc_freq)");
+    int invariant_tsc = 0;
+    outsz = sizeof invariant_tsc;
+    ret = sysctlbyname("kern.timecounter.invariant_tsc", &invariant_tsc, &outsz,
+            NULL, 0);
+    if (ret == -1)
+        err(1, "sysctl(kern.timecounter.invariant_tsc");
+    if (invariant_tsc != 1)
+        errx(1, "Host TSC is not invariant, cannot continue");
 
     vmm_set_reg(hvb->vmfd, VM_REG_GUEST_RIP, gpa_ep);
     vmm_set_reg(hvb->vmfd, VM_REG_GUEST_RFLAGS, X86_RFLAGS_INIT);

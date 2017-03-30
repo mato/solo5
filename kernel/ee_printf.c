@@ -49,7 +49,13 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
+#ifdef __SOLO5_KERNEL__
 #include "kernel.h"
+#else
+#include <stdarg.h>
+#define assert(x)
+#define platform_puts solo5_console_write
+#endif
 
 #undef HAS_FLOAT
 #define ZEROPAD  (1<<0)/* Pad with zero */

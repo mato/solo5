@@ -20,9 +20,14 @@
 
 #include <assert.h>
 #include <err.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+
+#define _WITH_DPRINTF
+#include <stdio.h>
 
 #include <sys/ioctl.h>
 #include <sys/mman.h>
@@ -35,6 +40,21 @@
 
 #include "ukvm.h"
 #include "ukvm_hv_bhyve.h"
+
+/* XXX */
+static struct ukvm_hv *hack;
+
+static void cleanup_vm(void)
+{
+    if (hack != NULL)
+        sysctlbyname("hw.vmm.destroy", NULL, NULL, "ukvm", 4);
+}
+
+static void cleanup_vmfd(void)
+{
+    if (hack != NULL && hack->b->vmfd != -1)
+        close(hack->b->vmfd);
+}
 
 struct ukvm_hv *ukvm_hv_init(size_t mem_size)
 {
@@ -49,15 +69,25 @@ struct ukvm_hv *ukvm_hv_init(size_t mem_size)
         err(1, "malloc");
     memset(hvb, 0, sizeof (struct ukvm_hvb));
     hv->b = hvb;
+    hvb->vmfd = -1;
 
-    /* XXX This seems to fail every second time!? */
-    sysctlbyname("hw.vmm.destroy", NULL, NULL, "ukvm", 4);
-    ret = sysctlbyname("hw.vmm.create", NULL, NULL, "ukvm", 4);
+    int namelen = asprintf(&hvb->vmname, "ukvm%d", getpid());
+    if (namelen == -1)
+        err(1, "asprintf");
+    ret = sysctlbyname("hw.vmm.create", NULL, NULL, hvb->vmname, namelen);
     if (ret == -1)
-	err(1, "sysctl(hw.vmm.create)");
-    hvb->vmfd = open("/dev/vmm/ukvm", O_RDWR, 0);
+        err(1, "Cannot create VM '%s'", hvb->vmname);
+    hack = hv;
+    atexit(cleanup_vm);
+
+    char *vmmdevname;
+    namelen = asprintf(&vmmdevname, "/dev/vmm/%s", hvb->vmname);
+    if (namelen == -1)
+        err(1, "asprintf");
+    hvb->vmfd = open(vmmdevname, O_RDWR, 0);
     if (hvb->vmfd == -1)
-	err(1, "vm_open");
+	err(1, "open(%s)", vmmdevname);
+    atexit(cleanup_vmfd);
 
     struct vm_capability vmcap = {
 	.cpuid = 0, .captype = VM_CAP_HALT_EXIT, .capval = 1
