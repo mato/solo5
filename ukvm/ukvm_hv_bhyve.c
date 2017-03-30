@@ -47,7 +47,8 @@ static struct ukvm_hv *hack;
 static void cleanup_vm(void)
 {
     if (hack != NULL)
-        sysctlbyname("hw.vmm.destroy", NULL, NULL, "ukvm", 4);
+        sysctlbyname("hw.vmm.destroy", NULL, NULL,
+                     hack->b->vmname, sizeof(hack->b->vmname));
 }
 
 static void cleanup_vmfd(void)
