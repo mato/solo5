@@ -113,6 +113,11 @@ void ukvm_hv_vcpu_init(struct ukvm_hv *hv, ukvm_gpa_t gpa_ep,
     bi->kernel_end = gpa_kend;
     bi->cmdline = X86_CMDLINE_BASE;
 
+    size_t tmp = sizeof bi->tsc_freq;
+    int ret = sysctlbyname("machdep.tsc_freq", &bi->tsc_freq, &tmp, NULL, 0);
+    if (ret == -1)
+        err(1, "sysctl(machdep.tsc_freq)");
+
     vmm_set_reg(hvb->vmfd, VM_REG_GUEST_RIP, gpa_ep);
     vmm_set_reg(hvb->vmfd, VM_REG_GUEST_RFLAGS, X86_RFLAGS_INIT);
     vmm_set_reg(hvb->vmfd, VM_REG_GUEST_RSP, hv->mem_size - 8);
@@ -121,7 +126,7 @@ void ukvm_hv_vcpu_init(struct ukvm_hv *hv, ukvm_gpa_t gpa_ep,
     struct vm_activate_cpu ac = {
         .vcpuid = 0
     };
-    int ret = ioctl(hvb->vmfd, VM_ACTIVATE_CPU, &ac);
+    ret = ioctl(hvb->vmfd, VM_ACTIVATE_CPU, &ac);
     if (ret == -1)
         err(1, "VM_ACTIVATE_CPU");
 
@@ -184,6 +189,15 @@ void ukvm_hv_vcpu_loop(struct ukvm_hv *hv)
             ukvm_gpa_t gpa = vme->u.inout.eax;
             fn(hv, gpa);
             break;
+        }
+
+        case VM_EXITCODE_BOGUS: {
+            /*
+             * I've no idea what this actually means, so just do what bhyve
+             * does.
+             */
+             assert(vme->inst_length == 0);
+             break;
         }
 
         case VM_EXITCODE_VMX: {

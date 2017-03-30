@@ -139,7 +139,7 @@ run_test ()
 
         case ${NAME} in
         *.ukvm)
-            [ -c /dev/kvm -a -w /dev/kvm ] || exit 98
+            # [ -c /dev/kvm -a -w /dev/kvm ] || exit 98
             UKVM=${TEST_DIR}/ukvm-bin
             [ -n "${DISK}" ] && UKVM="${UKVM} --disk=${DISK}"
             [ -n "${NET}" ] && UKVM="${UKVM} --net=${NET}"

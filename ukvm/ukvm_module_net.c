@@ -30,12 +30,17 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
+#if defined(__linux__)
 /*
  * Linux TAP device specific.
  */
 #include <sys/socket.h>
 #include <linux/if.h>
 #include <linux/if_tun.h>
+#elif defined(__FreeBSD__)
+#else
+#error Foo
+#endif
 
 #include "ukvm.h"
 
@@ -56,8 +61,7 @@ static int cmdline_mac = 0;
  */
 static int tap_attach(const char *dev)
 {
-    struct ifreq ifr;
-    int fd, err;
+    int fd;
 
     /*
      * Syntax @<number> indicates a prexisting open fd onto the correct device.
@@ -70,6 +74,10 @@ static int tap_attach(const char *dev)
 
         return fd;
     }
+
+#if defined(__linux__)
+    int err;
+    struct ifreq ifr;
 
     fd = open("/dev/net/tun", O_RDWR | O_NONBLOCK);
     if (fd == -1)
@@ -125,6 +133,14 @@ static int tap_attach(const char *dev)
         errno = ENODEV;
         return -1;
     }
+#elif defined(__FreeBSD__)
+    char devname[strlen(dev) + 6];
+    
+    snprintf(devname, sizeof devname, "/dev/%s", dev);
+    fd = open(devname, O_RDWR | O_NONBLOCK);
+    if (fd == -1)
+        return -1;
+#endif
 
     return fd;
 }
