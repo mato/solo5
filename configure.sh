@@ -92,7 +92,7 @@ case $(uname -s) in
         if [ "${TARGET_ARCH}" = "x86_64" ]; then
             BUILD_VIRTIO="yes"
             BUILD_MUEN="yes"
-            BUILD_GENODE="yes"
+            BUILD_GENODE="no"
         else
             BUILD_VIRTIO="no"
             BUILD_MUEN="no"
@@ -126,7 +126,7 @@ case $(uname -s) in
         BUILD_HVT="yes"
         BUILD_VIRTIO="yes"
         BUILD_MUEN="yes"
-        BUILD_GENODE="yes"
+        BUILD_GENODE="no"
         ;;
     OpenBSD)
         # On OpenBSD/clang we use -nostdlibinc which gives us access to the
@@ -158,7 +158,7 @@ case $(uname -s) in
         BUILD_HVT="yes"
         BUILD_VIRTIO="yes"
         BUILD_MUEN="yes"
-        BUILD_GENODE="yes"
+        BUILD_GENODE="no"
         ;;
     *)
         die "Unsupported build OS: $(uname -s)"
