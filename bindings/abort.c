@@ -53,3 +53,17 @@ void _abort(const char *file, const char *line, const char *s, void *regs_hint)
     puts("\n");
     platform_exit(SOLO5_EXIT_ABORT, regs_hint);
 }
+
+/*
+ * This will be initialised to a pseudo-random value by _start(), keep an
+ * easily recognisable "terminator" value here to flag if that did not happen
+ * as expected.
+ */
+uintptr_t __stack_chk_guard = 0x00deadbeef0d0a00;
+
+__attribute__((noreturn))
+void __stack_chk_fail(void)
+{
+    puts("Solo5: ABORT: Stack smashing detected\n");
+    platform_exit(SOLO5_EXIT_ABORT, NULL);
+}

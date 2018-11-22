@@ -22,9 +22,13 @@
 
 extern void _newstack(uint64_t stack_start, void (*tramp)(void *), void *arg);
 static void _start2(void *arg) __attribute__((noreturn));
+extern uintptr_t __stack_chk_guard;
 
 void _start(void *arg)
 {
+    __stack_chk_guard = cpu_rdtsc() + (cpu_rdtsc() << 32UL);
+    __stack_chk_guard &= ~(uintptr_t)0xff;
+
     volatile int gdb = 1;
 
     serial_init();

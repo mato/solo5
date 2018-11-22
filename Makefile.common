@@ -28,9 +28,9 @@ LD?=ld
 OBJCOPY?=objcopy
 
 # Exported to OPAM via pkg-config.
-MD_CFLAGS=$(HOST_CFLAGS) -ffreestanding
+MD_CFLAGS=$(HOST_CFLAGS) -ffreestanding -fstack-protector-strong
 ifeq ($(TARGET_ARCH), x86_64)
-MD_CFLAGS+=-mno-red-zone
+MD_CFLAGS+=-mno-red-zone -mstack-protector-guard=global
 endif
 
 # Likewise.

@@ -18,39 +18,25 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include "bindings.h"
+#include "solo5.h"
+#include "../../bindings/lib.c"
 
-extern uintptr_t __stack_chk_guard;
-
-#if defined(__x86_64__)
-#define READ_CPU_TICKS cpu_rdtsc
-#elif defined(__aarch64__)
-#define READ_CPU_TICKS cpu_cntvct
-#else
-#error Unsupported architecture
-#endif
-
-void _start(void *arg)
+static void puts(const char *s)
 {
-    __stack_chk_guard = READ_CPU_TICKS() + (READ_CPU_TICKS() << 32UL);
-    __stack_chk_guard &= ~(uintptr_t)0xff;
+    solo5_console_write(s, strlen(s));
+}
 
-    static struct solo5_start_info si;
+int solo5_app_main(const struct solo5_start_info *si __attribute__((unused)))
+{
+    puts("\n**** Solo5 standalone test_ssp ****\n\n");
 
-    console_init();
-    cpu_init();
-    platform_init(arg);
-    si.cmdline = cmdline_parse(platform_cmdline());
+    /*
+     * Now overwrite this functions canary, this will cause
+     * an ABORT via __stack_chk_fail().
+     */
+    char buffer[16];
+    strcpy (buffer, "1234567890123456789012345678901234567890\n");
+    puts(buffer);
 
-    log(INFO, "            |      ___|\n");
-    log(INFO, "  __|  _ \\  |  _ \\ __ \\\n");
-    log(INFO, "\\__ \\ (   | | (   |  ) |\n");
-    log(INFO, "____/\\___/ _|\\___/____/\n");
-
-    mem_init();
-    time_init(arg);
-    net_init();
-
-    mem_lock_heap(&si.heap_start, &si.heap_size);
-    solo5_exit(solo5_app_main(&si));
+    return SOLO5_EXIT_SUCCESS;
 }
