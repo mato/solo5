@@ -252,7 +252,7 @@ case ${CC_MACHINE} in
     x86_64-*linux*)
         CONFIG_ARCH=x86_64 CONFIG_HOST=Linux
         CONFIG_GUEST_PAGE_SIZE=0x1000
-        AVAILABLE_TARGETS="hvt,spt,virtio,muen,genode,xen"
+        AVAILABLE_TARGETS="hvt,spt,virtio,muen,xen"
         CONFIG_TARGETS="hvt,spt,virtio,muen,xen"
         ;;
     aarch64-*linux*)
@@ -318,7 +318,7 @@ while [ $# -gt 0 ]; do
 done
 
 [ "${CONFIG_TARGETS}" = "force-all" ] && \
-    CONFIG_TARGETS="hvt,spt,virtio,muen,genode,xen"
+    CONFIG_TARGETS="hvt,spt,virtio,muen,xen"
 [ "${CONFIG_TARGETS}" = "none" ] && \
     CONFIG_TARGETS=
 enable_targets "${CONFIG_TARGETS}"
@@ -372,7 +372,6 @@ CONFIG_HVT=${CONFIG_HVT}
 CONFIG_SPT=${CONFIG_SPT}
 CONFIG_VIRTIO=${CONFIG_VIRTIO}
 CONFIG_MUEN=${CONFIG_MUEN}
-CONFIG_GENODE=${CONFIG_GENODE}
 CONFIG_XEN=${CONFIG_XEN}
 MAKECONF_CFLAGS=${MAKECONF_CFLAGS}
 MAKECONF_LDFLAGS=${MAKECONF_LDFLAGS}
@@ -393,6 +392,5 @@ echo -n "${prog_NAME}: Enabled targets:"
 [ -n "${CONFIG_SPT}" ]    && echo -n " spt"
 [ -n "${CONFIG_VIRTIO}" ] && echo -n " virtio"
 [ -n "${CONFIG_MUEN}" ]   && echo -n " muen"
-[ -n "${CONFIG_GENODE}" ] && echo -n " genode"
 [ -n "${CONFIG_XEN}" ]    && echo -n " xen"
 echo "."
