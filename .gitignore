@@ -4,6 +4,7 @@
 *.lib.so
 *.pc
 Makeconf
+Makeconf.sh
 tags
 include/crt
 include/version.h
@@ -20,4 +21,5 @@ tenders/hvt/solo5-hvt-debug
 tenders/spt/solo5-spt
 elftool/solo5-elftool
 opam/release
+toolchain/
 solo5-*.tar.gz

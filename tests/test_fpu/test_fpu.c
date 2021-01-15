@@ -48,13 +48,13 @@ int solo5_app_main(const struct solo5_start_info *si __attribute__((unused)))
     );
 #elif defined(__aarch64__)
     __asm__(
-        "ldr q0, %0\n"
-        "ldr q1, %0\n"
+        "ld1.4s {v0}, %0\n"
+        "ld1.4s {v0}, %0\n"
         "fmul v0.4s, v1.4s, v0.4s\n"
-        "str q0, %0\n"
+        "st1.4s {v0}, %0\n"
         : "=m" (c)
         : "m" (c)
-        : "q0", "q1", "v0"
+        : "s0", "s1", "v0"
     );
 #elif defined(__powerpc64__)
 #define DOMUL(VAR) 			\

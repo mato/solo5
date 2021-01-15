@@ -19,8 +19,13 @@
 ifndef TOPDIR
 $(error TOPDIR must be set, run $(MAKE) from the top of the source tree or set it manually)
 endif
+include $(TOPDIR)/Makeconf
+
+#ifndef CONFIG_CROSS_COMPILE
 
 TESTDIRS := $(wildcard test_*)
+
+#endif # !CONFIG_CROSS_COMPILE
 
 TOPTARGETS := all clean
 

@@ -26,10 +26,9 @@ fatal()
 setup() {
   cd ${BATS_TEST_DIRNAME}
 
-  MAKECONF=../Makeconf
-  [ ! -f ${MAKECONF} ] && fatal "Can't find Makeconf, looked in ${MAKECONF}"
-  # This is subtle; see the comments in configure.sh.
-  eval $(grep -E ^CONFIG_ ${MAKECONF})
+  MAKECONF=../Makeconf.sh
+  [ ! -f ${MAKECONF} ] && fatal "Can't find Makeconf.sh, looked in ${MAKECONF}"
+  source ${MAKECONF}
 
   if [ -x "$(command -v timeout)" ]; then
     TIMEOUT=timeout
@@ -48,7 +47,7 @@ setup() {
 
   case "${BATS_TEST_NAME}" in
   *hvt)
-    [ -z "${CONFIG_HVT}" ] && skip
+    [ -z "${CONFIG_HVT_TENDER}" ] && skip
     case "${CONFIG_HOST}" in
     Linux)
       [ -c /dev/kvm -a -w /dev/kvm ] || skip "no access to /dev/kvm or not present"
@@ -69,7 +68,7 @@ setup() {
     VIRTIO=../scripts/virtio-run/solo5-virtio-run.sh
     ;;
   *spt)
-    [ -z "${CONFIG_SPT}" ] && skip
+    [ -z "${CONFIG_SPT_TENDER}" ] && skip
     SPT_TENDER=../tenders/spt/solo5-spt
     ;;
   *xen)
@@ -535,7 +534,7 @@ xen_expect_abort() {
 }
 
 @test "dumpcore hvt" {
-  [ "${CONFIG_ARCH}" = "x86_64" ] || skip "not implemented for ${CONFIG_ARCH}"
+  [ "${CONFIG_HOST_ARCH}" = "x86_64" ] || skip "not implemented for ${CONFIG_HOST_ARCH}"
   skip_unless_host_is Linux FreeBSD
 
   run ${TIMEOUT} --foreground 60s ${HVT_TENDER_DEBUG} \

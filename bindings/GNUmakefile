@@ -28,7 +28,7 @@ all_TARGETS :=
 .SUFFIXES:
 $(V).SILENT:
 
-common_SRCS := abort.c cpu_$(CONFIG_ARCH).c cpu_vectors_$(CONFIG_ARCH).S \
+common_SRCS := abort.c cpu_$(CONFIG_TARGET_ARCH).c cpu_vectors_$(CONFIG_TARGET_ARCH).S \
     crt.c printf.c intr.c lib.c mem.c exit.c log.c cmdline.c tls.c mft.c
 
 common_hvt_SRCS := hvt/platform.c hvt/platform_intr.c hvt/time.c
@@ -44,7 +44,7 @@ hvt_SRCS := hvt/start.c $(common_SRCS) $(common_hvt_SRCS) \
 spt_SRCS := spt/start.c \
     abort.c crt.c printf.c lib.c mem.c exit.c log.c cmdline.c tls.c mft.c \
     spt/bindings.c spt/block.c spt/net.c spt/platform.c \
-    spt/sys_linux_$(CONFIG_ARCH).c
+    spt/sys_linux_$(CONFIG_TARGET_ARCH).c
 
 virtio_SRCS := virtio/boot.S virtio/start.c $(common_SRCS) \
     virtio/platform.c virtio/platform_intr.c \
@@ -63,7 +63,7 @@ xen_SRCS := xen/boot.S xen/start.c $(common_SRCS) \
 
 CPPFLAGS+=-D__SOLO5_BINDINGS__
 
-ifeq ($(CONFIG_ARCH), x86_64)
+ifeq ($(CONFIG_TARGET_ARCH), x86_64)
 # Prevent the compiler from adding optimizations that use shared FPU state.
 # This is necessary for early boot code and trap handlers.
 CFLAGS+=-mno-sse -mno-mmx -mno-aes -mno-avx -mno-red-zone
@@ -82,13 +82,8 @@ all_TARGETS :=
 all_OBJS :=
 all_SRCS :=
 
-ifeq ($(CONFIG_HOST), OpenBSD)
-SSP_GUARD=__guard_local
-SSP_FAIL=__stack_smash_handler
-else
 SSP_GUARD=__stack_chk_guard
 SSP_FAIL=__stack_chk_fail
-endif
 define LINK.bindings
 	@echo "LD $@"
 	$(LD) -r $(LDFLAGS) $^ -o $@

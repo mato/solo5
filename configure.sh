@@ -19,6 +19,11 @@
 
 prog_NAME="$(basename $0)"
 
+err()
+{
+    echo "${prog_NAME}: ERROR: $@" 1>&2
+}
+
 die()
 {
     echo "${prog_NAME}: ERROR: $@" 1>&2
@@ -28,6 +33,20 @@ die()
 warn()
 {
     echo "${prog_NAME}: WARNING: $@" 1>&2
+}
+
+usage()
+{
+    cat <<EOM 1>&2
+usage: ${prog_NAME} [ OPTIONS ]
+
+Configures the Solo5 build system.
+
+Options:
+    --prefix=DIR:
+        Installation prefix (default: /usr/local).
+EOM
+    exit 1
 }
 
 cc_maybe_gcc()
@@ -50,7 +69,7 @@ cc_is_gcc()
     cc_maybe_gcc && ! cc_is_clang
 }
 
-gcc_check_option()
+cc_check_option()
 {
     ${CC} "$@" -x c -c -o /dev/null - <<EOM >/dev/null 2>&1
 int main(int argc, char *argv[])
@@ -60,7 +79,7 @@ int main(int argc, char *argv[])
 EOM
 }
 
-gcc_check_header()
+cc_check_header()
 {
     ${CC} ${PKG_CFLAGS} -x c -o /dev/null - <<EOM >/dev/null 2>&1
 #include <$@>
@@ -72,7 +91,7 @@ int main(int argc, char *argv[])
 EOM
 }
 
-gcc_check_lib()
+cc_check_lib()
 {
     ${CC} -x c -o /dev/null - "$@" ${PKG_LIBS} <<EOM >/dev/null 2>&1
 int main(int argc, char *argv[])
@@ -108,45 +127,75 @@ get_header_deps()
     )
 }
 
-config_host_linux()
-{
-    # On Linux/gcc we use -nostdinc and copy all the gcc-provided headers.
-    cc_is_gcc || die "Only 'gcc' 4.x+ is supported on Linux"
-    CC_INCDIR=$(${CC} -print-file-name=include)
-    [ -d "${CC_INCDIR}" ] || die "Cannot determine gcc include directory"
-    mkdir -p ${CRT_INCDIR}
-    cp -Rp ${CC_INCDIR}/. ${CRT_INCDIR}
+OPT_PREFIX=/usr/local
+OPT_TARGET=
+while [ $# -gt 0 ]; do
+    OPT="$1"
 
-    MAKECONF_CFLAGS="-nostdinc"
-    # Recent distributions now default to PIE enabled. Disable it explicitly
-    # if that's the case here.
-    # XXX: This breaks MirageOS in (at least) the build of mirage-solo5 due
-    # to -fno-pie breaking the build of lib/dllmirage-solo5_bindings.so.
-    # Keep this disabled until that is resolved.
-    # cc_has_pie && MAKECONF_CFLAGS="${MAKECONF_CFLAGS} -fno-pie"
+    case "${OPT}" in
+        --prefix=*)
+            OPT_PREFIX="${OPT##*=}"
+            ;;
+        --target=*)
+            OPT_TARGET="${OPT##*=}"
+            ;;
+        --help)
+            usage
+            ;;
+        *)
+            err "Unknown option: '${OPT}'"
+            usage
+            ;;
+    esac
 
-    # Stack smashing protection:
-    #
-    # Any GCC configured for a Linux/x86_64 target (actually, any
-    # glibc-based target) will use a TLS slot to address __stack_chk_guard.
-    # Disable this behaviour and use an ordinary global variable instead.
-    if [ "${CONFIG_ARCH}" = "x86_64" ] || [ "${CONFIG_ARCH}" = "ppc64le" ]; then
-        gcc_check_option -mstack-protector-guard=global || \
-            die "GCC 4.9.0 or newer is required for -mstack-protector-guard= support"
-        MAKECONF_CFLAGS="${MAKECONF_CFLAGS} -mstack-protector-guard=global"
-    fi
+    shift
+done
 
-    # The following runes are all spt-specific, so just return here if the
-    # caller doesn't want CONFIG_SPT.
-    [ -z "${CONFIG_SPT}" ] && return
+HOST_CC=${HOST_CC:-cc}
+HOST_CC_MACHINE=$(${HOST_CC} -dumpmachine)
+[ $? -ne 0 ] &&
+    die "Could not run '${HOST_CC} -dumpmachine', is your compiler working?"
+echo "${prog_NAME}: Using ${HOST_CC} for host toolchain (${HOST_CC_MACHINE})"
 
+CONFIG_SPT_TENDER=
+CONFIG_HVT_TENDER=
+case ${HOST_CC_MACHINE} in
+    x86_64-*linux*)
+        CONFIG_HOST_ARCH=x86_64 CONFIG_HOST=Linux
+        CONFIG_SPT_TENDER=1 CONFIG_HVT_TENDER=1
+        ;;
+    aarch64-*linux*)
+        CONFIG_HOST_ARCH=aarch64 CONFIG_HOST=Linux
+        CONFIG_SPT_TENDER=1 CONFIG_HVT_TENDER=1
+        ;;
+    powerpc64le-*linux*|ppc64le-*linux*)
+        CONFIG_HOST_ARCH=ppc64le CONFIG_HOST=Linux
+        CONFIG_SPT_TENDER=1
+        ;;
+    x86_64-*freebsd*)
+        CONFIG_HOST_ARCH=x86_64 CONFIG_HOST=FreeBSD
+        CONFIG_HVT_TENDER=1
+        ;;
+    amd64-*openbsd*)
+        CONFIG_HOST_ARCH=x86_64 CONFIG_HOST=OpenBSD
+        CONFIG_HVT_TENDER=1
+        ;;
+    *)
+        die "Unsupported host toolchain: ${HOST_CC_MACHINE}"
+        ;;
+esac
+
+CONFIG_SPT_TENDER_NO_PIE=
+CONFIG_SPT_TENDER_LIBSECCOMP_CFLAGS=
+CONFIG_SPT_TENDER_LIBSECCOMP_LDFLAGS=
+if [ -n "${CONFIG_SPT_TENDER}" ]; then
     # If the host toolchain is NOT configured to build PIE exectuables by
     # default, assume it has no support for that and apply a workaround by
     # locating the spt tender starting at a virtual address of 1 GB.
-    if ! cc_has_pie; then
+    if ! CC=${HOST_CC} cc_has_pie; then
         warn "Host toolchain does not build PIE executables, spt guest size will be limited to 1GB"
         warn "Consider upgrading to a Linux distribution with PIE support"
-        CONFIG_SPT_NO_PIE=1
+        CONFIG_SPT_TENDER_NO_PIE=1
     fi
 
     if ! command -v pkg-config >/dev/null; then
@@ -158,239 +207,160 @@ config_host_linux()
         if ! pkg-config --atleast-version=2.3.3 libseccomp; then
             # TODO Make this a hard error once there are no distros with
             # libseccomp < 2.3.3 in the various CIs.
-            warn "libseccomp >= 2.3.3 is required for correct spt operation"
+            warn "libseccomp >= 2.3.3 is required for correct spt tender operation"
             warn "Proceeding anyway, expect tests to fail"
         elif ! pkg-config --atleast-version=2.4.1 libseccomp; then
             warn "libseccomp < 2.4.1 has known vulnerabilities"
             warn "Proceeding anyway, but consider upgrading"
         fi
-        MAKECONF_SPT_CFLAGS=$(pkg-config --cflags libseccomp)
-        MAKECONF_SPT_LDLIBS=$(pkg-config --libs libseccomp)
+        CONFIG_SPT_TENDER_LIBSECCOMP_CFLAGS="$(pkg-config --cflags libseccomp)"
+        CONFIG_SPT_TENDER_LIBSECCOMP_LDLIBS="$(pkg-config --libs libseccomp)"
     fi
-    if ! PKG_CFLAGS=${MAKECONF_SPT_CFLAGS} gcc_check_header seccomp.h; then
+    if ! CC="${HOST_CC}" PKG_CFLAGS="${CONFIG_SPT_TENDER_LIBSECCOMP_CFLAGS}" \
+        cc_check_header seccomp.h; then
         die "Could not compile with seccomp.h"
     fi
-    if ! PKG_LIBS=${MAKECONF_SPT_LIBS} gcc_check_lib -lseccomp; then
-        die "Could not link with -lseccomp"
-    fi
-}
-
-config_host_freebsd()
-{
-    cc_is_clang || die "Only 'clang' is supported on FreeBSD"
-    [ "${CONFIG_ARCH}" = "x86_64" ] ||
-        die "Only 'x86_64' is supported on FreeBSD"
-
-    # On FreeBSD/clang we use -nostdlibinc which gives us access to the
-    # clang-provided headers for compiler instrinsics. We copy the rest
-    # (std*.h, float.h and their dependencies) from the host.
-    INCDIR=/usr/include
-    SRCS="float.h stddef.h stdint.h stdbool.h stdarg.h"
-    DEPS="$(mktemp)"
-    get_header_deps ${INCDIR} ${SRCS} >${DEPS} || \
-        die "Failure getting dependencies of host headers"
-    # cpio will fail if CRT_INCDIR is below a symlink, so squash that
-    mkdir -p ${CRT_INCDIR}
-    CRT_INCDIR="$(readlink -f ${CRT_INCDIR})"
-    (cd ${INCDIR} && cpio --quiet -Lpdm ${CRT_INCDIR} <${DEPS}) || \
-        die "Failure copying host headers"
-    rm ${DEPS}
-
-    # Stack smashing protection:
-    #
-    # FreeBSD toolchains use a global (non-TLS) __stack_chk_guard by
-    # default on x86_64, so there is nothing special we need to do here.
-    MAKECONF_CFLAGS="-nostdlibinc"
-
-    # enable capsicum(4) sandbox if FreeBSD kernel is new enough
-    [ "$(uname -K)" -ge 1200086 ] && CONFIG_HVT_FREEBSD_ENABLE_CAPSICUM=1
-}
-
-config_host_openbsd()
-{
-    cc_is_clang || die "Only 'clang' is supported on OpenBSD"
-    [ "${CONFIG_ARCH}" = "x86_64" ] ||
-        die "Only 'x86_64' is supported on OpenBSD"
-    if ! ld_is_lld; then
-        LD='/usr/bin/ld.lld'
-        warn "Using GNU 'ld' is not supported on OpenBSD"
-        warn "Falling back to 'ld.lld'"
-        [ -e ${LD} ] || die "/usr/bin/ld.lld does not exist"
-    fi
-
-    # On OpenBSD/clang we use -nostdlibinc which gives us access to the
-    # clang-provided headers for compiler instrinsics. We copy the rest
-    # (std*.h, cdefs.h and their dependencies) from the host.
-    INCDIR=/usr/include
-    SRCS="float.h stddef.h stdint.h stdbool.h stdarg.h"
-    DEPS="$(mktemp)"
-    get_header_deps ${INCDIR} ${SRCS} >${DEPS} || \
-        die "Failure getting dependencies of host headers"
-    # cpio will fail if CRT_INCDIR is below a symlink, so squash that
-    mkdir -p ${CRT_INCDIR}
-    CRT_INCDIR="$(readlink -f ${CRT_INCDIR})"
-    (cd ${INCDIR} && cpio -Lpdm ${CRT_INCDIR} <${DEPS}) || \
-        die "Failure copying host headers"
-    rm ${DEPS}
-
-    MAKECONF_CFLAGS="-mno-retpoline -fno-ret-protector -nostdlibinc"
-    MAKECONF_LDFLAGS="-nopie"
-}
-
-# Allow external override of CC and LD.
-CC=${CC:-cc}
-LD=${LD:-ld}
-
-CC_MACHINE=$(${CC} -dumpmachine)
-[ $? -ne 0 ] &&
-    die "Could not run '${CC} -dumpmachine', is your compiler working?"
-
-# Determine CONFIG_HOST, CONFIG_ARCH from master matrix of supported build
-# toolchain combinations (CC_MACHINE). Sets AVAILABLE_TARGETS and
-# CONFIG_TARGETS (default list of targets to enable if none specified).
-case ${CC_MACHINE} in
-    x86_64-*linux*)
-        CONFIG_ARCH=x86_64 CONFIG_HOST=Linux
-        CONFIG_GUEST_PAGE_SIZE=0x1000
-        AVAILABLE_TARGETS="hvt,spt,virtio,muen,xen"
-        CONFIG_TARGETS="hvt,spt,virtio,muen,xen"
-        ;;
-    aarch64-*linux*)
-        CONFIG_ARCH=aarch64 CONFIG_HOST=Linux
-        CONFIG_GUEST_PAGE_SIZE=0x1000
-        AVAILABLE_TARGETS="hvt,spt"
-        CONFIG_TARGETS="${AVAILABLE_TARGETS}"
-        ;;
-    powerpc64le-*linux*|ppc64le-*linux*)
-        CONFIG_ARCH=ppc64le CONFIG_HOST=Linux
-        CONFIG_GUEST_PAGE_SIZE=0x10000
-        AVAILABLE_TARGETS="spt"
-        CONFIG_TARGETS="${AVAILABLE_TARGETS}"
-        ;;
-    x86_64-*freebsd*)
-        CONFIG_ARCH=x86_64 CONFIG_HOST=FreeBSD
-        CONFIG_GUEST_PAGE_SIZE=0x1000
-        AVAILABLE_TARGETS="hvt,virtio,muen,xen"
-        CONFIG_TARGETS="${AVAILABLE_TARGETS}"
-        ;;
-    amd64-*openbsd*)
-        CONFIG_ARCH=x86_64 CONFIG_HOST=OpenBSD
-        CONFIG_GUEST_PAGE_SIZE=0x1000
-        AVAILABLE_TARGETS="hvt,virtio,muen,xen"
-        CONFIG_TARGETS="${AVAILABLE_TARGETS}"
-        ;;
-    *)
-        die "Unsupported toolchain target: ${CC_MACHINE}"
-        ;;
-esac
-
-# Arguments: Comma-separated list of TARGETS to enable.  Sets CONFIG_TARGET=1
-# for each TARGET that is enabled, dies with an error if any TARGET is not
-# supported on the current CONFIG_HOST/CONFIG_ARCH.
-enable_targets()
-{
-    OLDIFS=${IFS}
-    IFS=,
-    for target in $@; do
-        if echo ",${AVAILABLE_TARGETS}," | grep -q ",${target},"; then
-            tmp="$(echo ${target} | tr '[a-z]' '[A-Z]')"
-            eval "CONFIG_${tmp}=1"
-        else
-            die "--enable-targets: Target '${target}' is not available on ${CONFIG_HOST}/${CONFIG_ARCH}"
+    if [ -n "${CONFIG_SPT_TENDER_LIBSECCOMP_LDLIBS}" ]; then
+        if ! CC="${HOST_CC}" cc_check_lib ${CONFIG_SPT_TENDER_LIBSECCOMP_LDLIBS}; then
+            die "Could not link with ${CONFIG_SPT_TENDER_LIBSECCOMP_LDLIBS}"
         fi
-    done
-    IFS=${OLDIFS}
-}
+    fi
+fi
 
-while [ $# -gt 0 ]; do
-    OPT="$1"
+CONFIG_HVT_TENDER_FREEBSD_ENABLE_CAPSICUM=
+if [ "${CONFIG_HOST}" = "FreeBSD" -a -n "${CONFIG_HVT_TENDER}" ]; then
+    # enable capsicum(4) sandbox if FreeBSD kernel is new enough
+    [ "$(uname -K)" -ge 1200086 ] && CONFIG_HVT_TENDER_FREEBSD_ENABLE_CAPSICUM=1
+fi
 
-    case "${OPT}" in
-        --enable-targets=*)
-            CONFIG_TARGETS="${OPT##*=}"
-            ;;
-        *)
-            die "Unknown option: '${OPT}'"
-            ;;
-    esac
+TARGET_CC=${TARGET_CC:-clang}
+TARGET_LD=${TARGET_LD:-ld}
+TARGET_OBJCOPY=${TARGET_OBJCOPY:-objcopy}
 
-    shift
-done
+if [ -n "${OPT_TARGET}" ]; then
+    TARGET_CC="${TARGET_CC} --target=${OPT_TARGET}-unknown-none"
+    # TODO figure out binutils target triple
+    TARGET_LD="${OPT_TARGET}-linux-gnu-ld"
+    TARGET_OBJCOPY="${OPT_TARGET}-linux-gnu-objcopy"
+fi
 
-[ "${CONFIG_TARGETS}" = "force-all" ] && \
-    CONFIG_TARGETS="hvt,spt,virtio,muen,xen"
-[ "${CONFIG_TARGETS}" = "none" ] && \
-    CONFIG_TARGETS=
-enable_targets "${CONFIG_TARGETS}"
+TARGET_CC_MACHINE=$(${TARGET_CC} -dumpmachine)
+[ $? -ne 0 ] &&
+    die "Could not run '${TARGET_CC} -dumpmachine', is your compiler working?"
 
-# C runtime header files appropriated from the host toolchain are installed
-# here at configure time.
-CRT_INCDIR=${PWD}/include/crt
-
-MAKECONF_CFLAGS=
-MAKECONF_LDFLAGS=
-MAKECONF_SPT_CFLAGS=
-MAKECONF_SPT_LDLIBS=
-CONFIG_SPT_NO_PIE=
-CONFIG_HVT_FREEBSD_ENABLE_CAPSICUM=
-
-case "${CONFIG_HOST}" in
-    Linux)
-        config_host_linux
+CONFIG_HVT= CONFIG_SPT= CONFIG_VIRTIO= CONFIG_MUEN= CONFIG_XEN=
+case ${TARGET_CC_MACHINE} in
+    x86_64-*|amd64-*)
+        CONFIG_TARGET_ARCH=x86_64
+        CONFIG_TARGET_LD_MAX_PAGE_SIZE=0x1000
+        CONFIG_HVT=1 CONFIG_SPT=1 CONFIG_VIRTIO=1 CONFIG_MUEN=1 CONFIG_XEN=1
         ;;
-    FreeBSD)
-        config_host_freebsd
+    aarch64-*)
+        CONFIG_TARGET_ARCH=aarch64
+        CONFIG_TARGET_LD_MAX_PAGE_SIZE=0x1000
+        CONFIG_HVT=1 CONFIG_SPT=1
         ;;
-    OpenBSD)
-        config_host_openbsd
+    powerpc64le-*|ppc64le-*)
+        CONFIG_TARGET_ARCH=ppc64le
+        CONFIG_TARGET_LD_MAX_PAGE_SIZE=0x10000
+        CONFIG_SPT=1
         ;;
     *)
-        die "Unsupported build OS: ${CONFIG_HOST}"
+        die "Unsupported target toolchain: ${TARGET_CC_MACHINE}"
         ;;
 esac
 
-# WARNING:
+# TODO ex config_host_freebsd()
+# On FreeBSD/clang we use -nostdlibinc which gives us access to the
+# clang-provided headers for compiler instrinsics. We copy the rest
+# (std*.h, float.h and their dependencies) from the host.
+# INCDIR=/usr/include
+# SRCS="float.h stddef.h stdint.h stdbool.h stdarg.h"
+# DEPS="$(mktemp)"
+# get_header_deps ${INCDIR} ${SRCS} >${DEPS} || \
+#     die "Failure getting dependencies of host headers"
+# # cpio will fail if CRT_INCDIR is below a symlink, so squash that
+# mkdir -p ${CRT_INCDIR}
+# CRT_INCDIR="$(readlink -f ${CRT_INCDIR})"
+# (cd ${INCDIR} && cpio --quiet -Lpdm ${CRT_INCDIR} <${DEPS}) || \
+#     die "Failure copying host headers"
+# rm ${DEPS}
+
+# TODO ex config_host_openbsd()
+# CONFIG_CFLAGS="${CONFIG_CFLAGS} -mno-retpoline -fno-ret-protector -nostdlibinc"
+# CONFIG_LDFLAGS="${CONFIG_LDFLAGS} -nopie"
+
+case ${TARGET_CC_MACHINE} in
+    *openbsd*)
+        if ! LD="${TARGET_LD}" ld_is_lld; then
+            TARGET_LD="/usr/bin/ld.lld"
+            warn "Using GNU 'ld' is not supported on OpenBSD"
+            warn "Falling back to ${TARGET_LD}"
+            [ -e "${TARGET_LD}" ] || die "${TARGET_LD} does not exist"
+        fi
+        ;;
+esac
+
+CONFIG_TARGET_SPEC="${CONFIG_TARGET_ARCH}-solo5-none"
+CONFIG_TARGET_CLANG="${CONFIG_TARGET_ARCH}-unknown-none"
+echo "${prog_NAME}: Using ${TARGET_CC} for target toolchain (${CONFIG_TARGET_CLANG})"
+
+T="toolchain/bin"
+mkdir -p ${T}
+cat >"${T}/${CONFIG_TARGET_SPEC}-cc" <<EOM
+#!/bin/sh
+exec ${TARGET_CC} \
+    --target=${CONFIG_TARGET_CLANG} \
+    -nostdlibinc \
+    -ffreestanding \
+    -fstack-protector-strong \
+    "\$@"
+EOM
+chmod +x "${T}/${CONFIG_TARGET_SPEC}-cc"
+cat >"${T}/${CONFIG_TARGET_SPEC}-ld" <<EOM
+#!/bin/sh
+exec ${TARGET_LD} \
+    -nostdlib \
+    -z max-page-size=${CONFIG_TARGET_LD_MAX_PAGE_SIZE} \
+    -static \
+    "\$@"
+EOM
+chmod +x "${T}/${CONFIG_TARGET_SPEC}-ld"
+cat >"${T}/${CONFIG_TARGET_SPEC}-objcopy" <<EOM
+#!/bin/sh
+exec ${TARGET_OBJCOPY} \
+    "\$@"
+EOM
+chmod +x "${T}/${CONFIG_TARGET_SPEC}-objcopy"
+
 #
-# The generated Makeconf is dual-use! It is both sourced by GNU make, and by
-# the test suite. As such, a subset of this file must parse in both shell *and*
-# GNU make. Given the differences in quoting rules between the two
-# (unable to sensibly use VAR="VALUE"), our convention is as follows:
-#
-# 1. GNU make parses the entire file, i.e. all variables defined below are
-#    available to Makefiles.
-#
-# 2. Shell scripts parse the subset of *lines* starting with "CONFIG_". I.e.
-#    only variables named "CONFIG_..." are available. When adding new variables
-#    to this group you must ensure that they do not contain more than a single
-#    "word".
-#
-# Please do NOT add variable names with new prefixes without asking first.
+# Generate Makeconf, to be included by Makefiles.
 #
 cat <<EOM >Makeconf
-# Generated by configure.sh $@, using CC=${CC} for target ${CC_MACHINE}
+# Generated by configure.sh, using CC=${CC} for target ${CC_MACHINE}
+CONFIG_PREFIX=${OPT_PREFIX}
+CONFIG_HOST_ARCH=${CONFIG_HOST_ARCH}
+CONFIG_HOST=${CONFIG_HOST}
+CONFIG_HOST_CC=${HOST_CC}
 CONFIG_HVT=${CONFIG_HVT}
+CONFIG_HVT_TENDER_FREEBSD_ENABLE_CAPSICUM=${CONFIG_HVT_TENDER_FREEBSD_ENABLE_CAPSICUM}
+CONFIG_HVT_TENDER=${CONFIG_HVT_TENDER}
 CONFIG_SPT=${CONFIG_SPT}
+CONFIG_SPT_TENDER=${CONFIG_SPT_TENDER}
+CONFIG_SPT_TENDER_NO_PIE=${CONFIG_SPT_NO_PIE}
+CONFIG_SPT_TENDER_LIBSECCOMP_CFLAGS=${CONFIG_SPT_TENDER_LIBSECCOMP_CFLAGS}
+CONFIG_SPT_TENDER_LIBSECCOMP_LDLIBS=${CONFIG_SPT_TENDER_LIBSECCOMP_LDLIBS}
 CONFIG_VIRTIO=${CONFIG_VIRTIO}
 CONFIG_MUEN=${CONFIG_MUEN}
 CONFIG_XEN=${CONFIG_XEN}
-MAKECONF_CFLAGS=${MAKECONF_CFLAGS}
-MAKECONF_LDFLAGS=${MAKECONF_LDFLAGS}
-CONFIG_ARCH=${CONFIG_ARCH}
-CONFIG_HOST=${CONFIG_HOST}
-CONFIG_GUEST_PAGE_SIZE=${CONFIG_GUEST_PAGE_SIZE}
-MAKECONF_CC=${CC}
-MAKECONF_LD=${LD}
-MAKECONF_SPT_CFLAGS=${MAKECONF_SPT_CFLAGS}
-MAKECONF_SPT_LDLIBS=${MAKECONF_SPT_LDLIBS}
-CONFIG_SPT_NO_PIE=${CONFIG_SPT_NO_PIE}
-CONFIG_HVT_FREEBSD_ENABLE_CAPSICUM=${CONFIG_HVT_FREEBSD_ENABLE_CAPSICUM}
+CONFIG_TARGET_ARCH=${CONFIG_TARGET_ARCH}
+CONFIG_TARGET_CC=${CONFIG_TARGET_SPEC}-cc
+CONFIG_TARGET_LD=${CONFIG_TARGET_SPEC}-ld
+CONFIG_TARGET_OBJCOPY=${CONFIG_TARGET_SPEC}-objcopy
 EOM
 
-echo "${prog_NAME}: Configured for ${CC_MACHINE}."
-echo -n "${prog_NAME}: Enabled targets:"
-[ -n "${CONFIG_HVT}" ]    && echo -n " hvt"
-[ -n "${CONFIG_SPT}" ]    && echo -n " spt"
-[ -n "${CONFIG_VIRTIO}" ] && echo -n " virtio"
-[ -n "${CONFIG_MUEN}" ]   && echo -n " muen"
-[ -n "${CONFIG_XEN}" ]    && echo -n " xen"
-echo "."
+#
+# Generate Makeconf.sh, to be included by shell scripts.
+#
+sed -Ee 's/^([A-Z_]+)=(.*)$/\1="\2"/' Makeconf >Makeconf.sh
+
