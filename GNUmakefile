@@ -28,7 +28,7 @@ tests: bindings elftool
 .PHONY: $(SUBDIRS)
 
 .PHONY: build
-build: $(SUBDIRS) $(PCFILES)
+build: $(SUBDIRS)
 .DEFAULT_GOAL := build
 
 $(SUBDIRS): gen-version-h
@@ -69,39 +69,34 @@ $(SUBDIRS):
 	@echo "MAKE $@"
 	$(MAKE) -C $@ $(MAKECMDGOALS) $(SUBOVERRIDE)
 
-.PHONY: clean before-clean
-# Ensure that a top-level "make clean" always cleans *all* possible build
-# products and not some subset dependent on the setting of $(BUILD_*).
-before-clean:
-	$(eval export SUBOVERRIDE := CONFIG_HVT=1 CONFIG_SPT=1 CONFIG_VIRTIO=1 CONFIG_MUEN=1 CONFIG_GENODE=1 CONFIG_XEN=1)
-clean: before-clean $(SUBDIRS)
+.PHONY: clean
+clean: $(SUBDIRS)
 	@echo "CLEAN solo5"
-	$(RM) $(PCFILES) $(VERSION_H)
+	$(RM) $(VERSION_H)
 
 .PHONY: distclean
 distclean: MAKECMDGOALS := clean
 distclean: clean
 	@echo DISTCLEAN solo5
 	-[ -d include/crt ] && $(RM) -r include/crt
-	$(RM) Makeconf
+	$(RM) Makeconf Makeconf.sh solo5-config.sh
 
 DESTDIR ?=
-PREFIX ?= /usr/local
-PCFILEDIR ?= /lib/pkgconfig
-PCFILES := pkgconfig/solo5-bindings-hvt.pc \
-    pkgconfig/solo5-bindings-spt.pc \
-    pkgconfig/solo5-bindings-virtio.pc \
-    pkgconfig/solo5-bindings-muen.pc \
-    pkgconfig/solo5-bindings-genode.pc \
-    pkgconfig/solo5-bindings-xen.pc
+PREFIX := $(MAKECONF_PREFIX)
 D := $(DESTDIR)$(PREFIX)
+SYS := $(shell uname -s)
+ifeq ($(SYS),OpenBSD)
+INSTALL := ginstall -p
+else
 INSTALL := install -p
+endif
 
 .PHONY: install-tools
 install-tools: MAKECMDGOALS :=
 install-tools: build
 	@echo INSTALL tools
 	$(INSTALL) -d $(D)/bin
+	$(INSTALL) solo5-config.sh $(D)/bin/solo5-config
 	$(INSTALL) elftool/solo5-elftool $(D)/bin
 	$(INSTALL) scripts/virtio-mkimage/solo5-virtio-mkimage.sh \
 	    $(D)/bin/solo5-virtio-mkimage
@@ -129,36 +124,29 @@ install-bindings: MAKECMDGOALS :=
 install-bindings: build
 	@echo INSTALL bindings
 	$(INSTALL) -d $(D)/lib/solo5
-	$(INSTALL) -d $(D)$(PCFILEDIR)
 ifdef CONFIG_HVT
 	$(INSTALL) -m 0644 bindings/hvt/solo5_hvt.o $(D)/lib/solo5
 	$(INSTALL) -m 0644 bindings/hvt/solo5_hvt.lds $(D)/lib/solo5
-	$(INSTALL) -m 0644 pkgconfig/solo5-bindings-hvt.pc $(D)$(PCFILEDIR)
 endif
 ifdef CONFIG_SPT
 	$(INSTALL) -m 0644 bindings/spt/solo5_spt.o $(D)/lib/solo5
 	$(INSTALL) -m 0644 bindings/spt/solo5_spt.lds $(D)/lib/solo5
-	$(INSTALL) -m 0644 pkgconfig/solo5-bindings-spt.pc $(D)$(PCFILEDIR)
 endif
 ifdef CONFIG_VIRTIO
 	$(INSTALL) -m 0644 bindings/virtio/solo5_virtio.o $(D)/lib/solo5
 	$(INSTALL) -m 0644 bindings/virtio/solo5_virtio.lds $(D)/lib/solo5
-	$(INSTALL) -m 0644 pkgconfig/solo5-bindings-virtio.pc $(D)$(PCFILEDIR)
 endif
 ifdef CONFIG_MUEN
 	$(INSTALL) -m 0644 bindings/muen/solo5_muen.o $(D)/lib/solo5
 	$(INSTALL) -m 0644 bindings/muen/solo5_muen.lds $(D)/lib/solo5
-	$(INSTALL) -m 0644 pkgconfig/solo5-bindings-muen.pc $(D)$(PCFILEDIR)
 endif
 ifdef CONFIG_GENODE
 	$(INSTALL) -m 0644 bindings/genode/solo5.lib.so $(D)/lib/solo5
 	$(INSTALL) -m 0644 bindings/genode/genode_dyn.ld $(D)/lib/solo5
-	$(INSTALL) -m 0644 pkgconfig/solo5-bindings-genode.pc $(D)$(PCFILEDIR)
 endif
 ifdef CONFIG_XEN
 	$(INSTALL) -m 0644 bindings/xen/solo5_xen.o $(D)/lib/solo5
 	$(INSTALL) -m 0644 bindings/xen/solo5_xen.lds $(D)/lib/solo5
-	$(INSTALL) -m 0644 pkgconfig/solo5-bindings-xen.pc $(D)$(PCFILEDIR)
 	cd include/xen && \
 	    find . -type d -exec $(INSTALL) -d \
 	    "$(D)/include/solo5/xen/{}" \;
@@ -166,7 +154,6 @@ ifdef CONFIG_XEN
 	    find . -type f -name '*.h' -exec $(INSTALL) -m 0644 \
 	    "{}" "$(D)/include/solo5/xen/{}" \;
 endif
-install-bindings: $(PCFILES)
 
 .PHONY: install-tenders
 install-tenders: MAKECMDGOALS :=
