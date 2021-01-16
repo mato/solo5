@@ -84,23 +84,17 @@ distclean: clean
 DESTDIR ?=
 PREFIX := $(MAKECONF_PREFIX)
 D := $(DESTDIR)$(PREFIX)
-SYS := $(shell uname -s)
-ifeq ($(SYS),OpenBSD)
-INSTALL := ginstall -p
-else
-INSTALL := install -p
-endif
 
 .PHONY: install-tools
 install-tools: MAKECMDGOALS :=
 install-tools: build
 	@echo INSTALL tools
-	$(INSTALL) -d $(D)/bin
-	$(INSTALL) solo5-config.sh $(D)/bin/solo5-config
-	$(INSTALL) elftool/solo5-elftool $(D)/bin
-	$(INSTALL) scripts/virtio-mkimage/solo5-virtio-mkimage.sh \
+	mkdir -p $(D)/bin
+	install -p solo5-config.sh $(D)/bin/solo5-config
+	install -p elftool/solo5-elftool $(D)/bin
+	install -p scripts/virtio-mkimage/solo5-virtio-mkimage.sh \
 	    $(D)/bin/solo5-virtio-mkimage
-	$(INSTALL) scripts/virtio-run/solo5-virtio-run.sh \
+	install -p scripts/virtio-run/solo5-virtio-run.sh \
 	    $(D)/bin/solo5-virtio-run
 
 PUBLIC_HEADERS := include/elf_abi.h include/hvt_abi.h include/mft_abi.h \
@@ -110,44 +104,42 @@ PUBLIC_HEADERS := include/elf_abi.h include/hvt_abi.h include/mft_abi.h \
 install-headers: MAKECMDGOALS :=
 install-headers: build
 	@echo INSTALL headers
-	$(INSTALL) -d $(D)/include/solo5
-	$(INSTALL) -m 0644 $(PUBLIC_HEADERS) $(D)/include/solo5
+	mkdir -p $(D)/include/solo5
+	install -p -m 0644 $(PUBLIC_HEADERS) $(D)/include/solo5
 	cd include/crt && \
-	    find . -type d -exec $(INSTALL) -d \
-	    "$(D)/include/solo5/crt/{}" \;
+	    find . -type d -exec mkdir -p "$(D)/include/solo5/crt/{}" \;
 	cd include/crt && \
-	    find . -type f -name '*.h' -exec $(INSTALL) -m 0644 \
+	    find . -type f -name '*.h' -exec install -p -m 0644 \
 	    "{}" "$(D)/include/solo5/crt/{}" \;
 
 .PHONY: install-bindings
 install-bindings: MAKECMDGOALS :=
 install-bindings: build
 	@echo INSTALL bindings
-	$(INSTALL) -d $(D)/lib/solo5
+	mkdir -p $(D)/lib/solo5
 ifdef CONFIG_HVT
-	$(INSTALL) -m 0644 bindings/hvt/solo5_hvt.o $(D)/lib/solo5
-	$(INSTALL) -m 0644 bindings/hvt/solo5_hvt.lds $(D)/lib/solo5
+	install -p -m 0644 bindings/hvt/solo5_hvt.o $(D)/lib/solo5
+	install -p -m 0644 bindings/hvt/solo5_hvt.lds $(D)/lib/solo5
 endif
 ifdef CONFIG_SPT
-	$(INSTALL) -m 0644 bindings/spt/solo5_spt.o $(D)/lib/solo5
-	$(INSTALL) -m 0644 bindings/spt/solo5_spt.lds $(D)/lib/solo5
+	install -p -m 0644 bindings/spt/solo5_spt.o $(D)/lib/solo5
+	install -p -m 0644 bindings/spt/solo5_spt.lds $(D)/lib/solo5
 endif
 ifdef CONFIG_VIRTIO
-	$(INSTALL) -m 0644 bindings/virtio/solo5_virtio.o $(D)/lib/solo5
-	$(INSTALL) -m 0644 bindings/virtio/solo5_virtio.lds $(D)/lib/solo5
+	install -p -m 0644 bindings/virtio/solo5_virtio.o $(D)/lib/solo5
+	install -p -m 0644 bindings/virtio/solo5_virtio.lds $(D)/lib/solo5
 endif
 ifdef CONFIG_MUEN
-	$(INSTALL) -m 0644 bindings/muen/solo5_muen.o $(D)/lib/solo5
-	$(INSTALL) -m 0644 bindings/muen/solo5_muen.lds $(D)/lib/solo5
+	install -p -m 0644 bindings/muen/solo5_muen.o $(D)/lib/solo5
+	install -p -m 0644 bindings/muen/solo5_muen.lds $(D)/lib/solo5
 endif
 ifdef CONFIG_XEN
-	$(INSTALL) -m 0644 bindings/xen/solo5_xen.o $(D)/lib/solo5
-	$(INSTALL) -m 0644 bindings/xen/solo5_xen.lds $(D)/lib/solo5
+	install -p -m 0644 bindings/xen/solo5_xen.o $(D)/lib/solo5
+	install -p -m 0644 bindings/xen/solo5_xen.lds $(D)/lib/solo5
 	cd include/xen && \
-	    find . -type d -exec $(INSTALL) -d \
-	    "$(D)/include/solo5/xen/{}" \;
+	    find . -type d -exec mkdir -p "$(D)/include/solo5/xen/{}" \;
 	cd include/xen && \
-	    find . -type f -name '*.h' -exec $(INSTALL) -m 0644 \
+	    find . -type f -name '*.h' -exec install -p -m 0644 \
 	    "{}" "$(D)/include/solo5/xen/{}" \;
 endif
 
@@ -155,14 +147,14 @@ endif
 install-tenders: MAKECMDGOALS :=
 install-tenders: build
 	@echo INSTALL tenders
-	$(INSTALL) -d $(D)/bin
+	mkdir -p $(D)/bin
 ifdef CONFIG_HVT
-	$(INSTALL) tenders/hvt/solo5-hvt $(D)/bin
+	install -p tenders/hvt/solo5-hvt $(D)/bin
 	- [ -f tenders/hvt/solo5-hvt-debug ] && \
-	    $(INSTALL) tenders/hvt/solo5-hvt-debug $(D)/bin
+	    install -p tenders/hvt/solo5-hvt-debug $(D)/bin
 endif
 ifdef CONFIG_SPT
-	$(INSTALL) tenders/spt/solo5-spt $(D)/bin
+	install -p tenders/spt/solo5-spt $(D)/bin
 endif
 
 .PHONY: install
