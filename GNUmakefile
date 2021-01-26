@@ -89,7 +89,6 @@ INSTALL := install -p
 .PHONY: install-tools
 install-tools: MAKECMDGOALS :=
 install-tools: build
-ifndef CONFIG_CROSS_COMPILE
 	@echo INSTALL tools
 	mkdir -p $(D)/bin
 	$(INSTALL) solo5-config.sh $(D)/bin/solo5-config
@@ -98,7 +97,6 @@ ifndef CONFIG_CROSS_COMPILE
 	    $(D)/bin/solo5-virtio-mkimage
 	$(INSTALL) scripts/virtio-run/solo5-virtio-run.sh \
 	    $(D)/bin/solo5-virtio-run
-endif # !CONFIG_CROSS_COMPILE
 
 PUBLIC_HEADERS := include/elf_abi.h include/hvt_abi.h include/mft_abi.h \
     include/spt_abi.h include/solo5.h
