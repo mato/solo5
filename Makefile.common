@@ -34,7 +34,7 @@ CFLAGS := $(MAKECONF_CFLAGS) -std=c11 -Wall -Wextra -Werror -O2 -g
 CPPFLAGS := -isystem $(TOPDIR)/include/crt -I$(TOPDIR)/include
 LD := $(MAKECONF_LD)
 LDFLAGS := $(MAKECONF_LDFLAGS)
-OBJCOPY := objcopy
+OBJCOPY := $(MAKECONF_OBJCOPY)
 
 # Also used by the HOST_ rules below.
 DEPFLAGS = -MT $@ -MMD -MP -MF $*.Td

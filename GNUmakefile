@@ -89,6 +89,7 @@ INSTALL := install -p
 .PHONY: install-tools
 install-tools: MAKECMDGOALS :=
 install-tools: build
+ifndef CONFIG_CROSS_COMPILE
 	@echo INSTALL tools
 	mkdir -p $(D)/bin
 	$(INSTALL) solo5-config.sh $(D)/bin/solo5-config
@@ -97,6 +98,7 @@ install-tools: build
 	    $(D)/bin/solo5-virtio-mkimage
 	$(INSTALL) scripts/virtio-run/solo5-virtio-run.sh \
 	    $(D)/bin/solo5-virtio-run
+endif # !CONFIG_CROSS_COMPILE
 
 PUBLIC_HEADERS := include/elf_abi.h include/hvt_abi.h include/mft_abi.h \
     include/spt_abi.h include/solo5.h
@@ -113,30 +115,37 @@ install-headers: build
 	    find . -type f -name '*.h' -exec $(INSTALL) -m 0644 \
 	    "{}" "$(D)/include/solo5/crt/{}" \;
 
+# XXX Not yet
+# ifndef CONFIG_CROSS_COMPILE
+LIBDIR := $(D)/lib/solo5
+# else
+# LIBDIR := $(D)/lib/solo5/$(CONFIG_ARCH)
+# endif
+
 .PHONY: install-bindings
 install-bindings: MAKECMDGOALS :=
 install-bindings: build
 	@echo INSTALL bindings
-	mkdir -p $(D)/lib/solo5
+	mkdir -p $(LIBDIR)
 ifdef CONFIG_HVT
-	$(INSTALL) -m 0644 bindings/hvt/solo5_hvt.o $(D)/lib/solo5
-	$(INSTALL) -m 0644 bindings/hvt/solo5_hvt.lds $(D)/lib/solo5
+	$(INSTALL) -m 0644 bindings/hvt/solo5_hvt.o $(LIBDIR)
+	$(INSTALL) -m 0644 bindings/hvt/solo5_hvt.lds $(LIBDIR)
 endif
 ifdef CONFIG_SPT
-	$(INSTALL) -m 0644 bindings/spt/solo5_spt.o $(D)/lib/solo5
-	$(INSTALL) -m 0644 bindings/spt/solo5_spt.lds $(D)/lib/solo5
+	$(INSTALL) -m 0644 bindings/spt/solo5_spt.o $(LIBDIR)
+	$(INSTALL) -m 0644 bindings/spt/solo5_spt.lds $(LIBDIR)
 endif
 ifdef CONFIG_VIRTIO
-	$(INSTALL) -m 0644 bindings/virtio/solo5_virtio.o $(D)/lib/solo5
-	$(INSTALL) -m 0644 bindings/virtio/solo5_virtio.lds $(D)/lib/solo5
+	$(INSTALL) -m 0644 bindings/virtio/solo5_virtio.o $(LIBDIR)
+	$(INSTALL) -m 0644 bindings/virtio/solo5_virtio.lds $(LIBDIR)
 endif
 ifdef CONFIG_MUEN
-	$(INSTALL) -m 0644 bindings/muen/solo5_muen.o $(D)/lib/solo5
-	$(INSTALL) -m 0644 bindings/muen/solo5_muen.lds $(D)/lib/solo5
+	$(INSTALL) -m 0644 bindings/muen/solo5_muen.o $(LIBDIR)
+	$(INSTALL) -m 0644 bindings/muen/solo5_muen.lds $(LIBDIR)
 endif
 ifdef CONFIG_XEN
-	$(INSTALL) -m 0644 bindings/xen/solo5_xen.o $(D)/lib/solo5
-	$(INSTALL) -m 0644 bindings/xen/solo5_xen.lds $(D)/lib/solo5
+	$(INSTALL) -m 0644 bindings/xen/solo5_xen.o $(LIBDIR)
+	$(INSTALL) -m 0644 bindings/xen/solo5_xen.lds $(LIBDIR)
 	cd include/xen && \
 	    find . -type d -exec mkdir -p "$(D)/include/solo5/xen/{}" \;
 	cd include/xen && \
@@ -147,6 +156,7 @@ endif
 .PHONY: install-tenders
 install-tenders: MAKECMDGOALS :=
 install-tenders: build
+ifndef CONFIG_CROSS_COMPILE
 	@echo INSTALL tenders
 	mkdir -p $(D)/bin
 ifdef CONFIG_HVT
@@ -157,6 +167,7 @@ endif
 ifdef CONFIG_SPT
 	$(INSTALL) tenders/spt/solo5-spt $(D)/bin
 endif
+endif # !CONFIG_CROSS_COMPILE
 
 .PHONY: install
 install: MAKECMDGOALS :=

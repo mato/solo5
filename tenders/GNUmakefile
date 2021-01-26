@@ -52,6 +52,8 @@ all_TARGETS += $(common_LIB)
 
 endif
 
+ifndef CONFIG_CROSS_COMPILE
+
 ifdef CONFIG_HVT
 
 hvt_SRCS := hvt/hvt_boot_info.c hvt/hvt_core.c hvt/hvt_main.c \
@@ -114,6 +116,8 @@ spt/solo5-spt: $(spt_OBJS) $(common_LIB)
 all_TARGETS += spt/solo5-spt
 
 endif # CONFIG_SPT
+
+endif # !CONFIG_CROSS_COMPILE
 
 all: $(all_TARGETS)
 
