@@ -107,6 +107,9 @@ while [ $# -gt 0 ]; do
         --toolchain=static)
             TOOLCHAIN=static
             ;;
+	--arch)
+	    echo "${CONFIG_ARCH}"
+	    ;;
         --cc)
             echo "${MAKECONF_CC}"
             ;;

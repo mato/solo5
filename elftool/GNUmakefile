@@ -37,7 +37,7 @@ $(V).SILENT:
 %.d: ;
 .PRECIOUS: %.d
 
-ifndef CONFIG_CROSS_COMPILE
+#ifndef CONFIG_CROSS_COMPILE
 
 elftool_SRCS := elftool.c
 elftool_OBJS := $(patsubst %.c,%.o,$(elftool_SRCS))
@@ -47,7 +47,7 @@ all_TARGETS += solo5-elftool
 solo5-elftool: $(elftool_OBJS)
 	$(HOSTLINK)
 
-endif # !CONFIG_CROSS_COMPILE
+#endif # !CONFIG_CROSS_COMPILE
 
 all: $(all_TARGETS)
 
