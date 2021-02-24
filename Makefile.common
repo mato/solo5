@@ -31,7 +31,7 @@ include $(TOPDIR)/Makeconf
 #
 CC := $(TOPDIR)/toolchain/bin/$(CONFIG_TARGET_CC)
 CFLAGS := -std=c11 -Wall -Wextra -Werror -O2 -g
-CPPFLAGS := -isystem $(TOPDIR)/include/crt -I$(TOPDIR)/include
+CPPFLAGS :=
 LD := $(TOPDIR)/toolchain/bin/$(CONFIG_TARGET_LD)
 LDFLAGS := 
 OBJCOPY := $(TOPDIR)/toolchain/bin/$(CONFIG_TARGET_OBJCOPY)

@@ -110,7 +110,7 @@ ld_is_lld()
 # For the header FILES..., all of which must be relative to PATH, resolve their
 # dependencies using the C preprocessor and output a list of FILES... plus all
 # their unique dependencies, also relative to PATH.
-get_header_deps()
+cc_get_header_deps()
 {
     local path="$1"
     shift
@@ -270,22 +270,6 @@ case ${TARGET_CC_MACHINE} in
         ;;
 esac
 
-# TODO ex config_host_freebsd()
-# On FreeBSD/clang we use -nostdlibinc which gives us access to the
-# clang-provided headers for compiler instrinsics. We copy the rest
-# (std*.h, float.h and their dependencies) from the host.
-# INCDIR=/usr/include
-# SRCS="float.h stddef.h stdint.h stdbool.h stdarg.h"
-# DEPS="$(mktemp)"
-# get_header_deps ${INCDIR} ${SRCS} >${DEPS} || \
-#     die "Failure getting dependencies of host headers"
-# # cpio will fail if CRT_INCDIR is below a symlink, so squash that
-# mkdir -p ${CRT_INCDIR}
-# CRT_INCDIR="$(readlink -f ${CRT_INCDIR})"
-# (cd ${INCDIR} && cpio --quiet -Lpdm ${CRT_INCDIR} <${DEPS}) || \
-#     die "Failure copying host headers"
-# rm ${DEPS}
-
 # TODO ex config_host_openbsd()
 # CONFIG_CFLAGS="${CONFIG_CFLAGS} -mno-retpoline -fno-ret-protector -nostdlibinc"
 # CONFIG_LDFLAGS="${CONFIG_LDFLAGS} -nopie"
@@ -305,13 +289,54 @@ CONFIG_TARGET_SPEC="${CONFIG_TARGET_ARCH}-solo5-none"
 CONFIG_TARGET_CLANG="${CONFIG_TARGET_ARCH}-unknown-none"
 echo "${prog_NAME}: Using ${TARGET_CC} for target toolchain (${CONFIG_TARGET_CLANG})"
 
+[ -d "$PWD/toolchain" ] && err "toolchain/ already exists, run make distclean" \
+    && exit 1
+
+# Make Solo5 public headers available to the in-tree toolchain at a well-defined path.
+mkdir -p $PWD/toolchain/include
+ln -s ../../include $PWD/toolchain/include/solo5
+
+CRT_INCDIR=$PWD/toolchain/include/${CONFIG_TARGET_SPEC}
+mkdir -p ${CRT_INCDIR}
+case ${HOST_CC_MACHINE} in
+    *freebsd*|*openbsd*)
+        INCDIR=/usr/include
+        SRCS="float.h stddef.h stdint.h stdbool.h stdarg.h"
+        DEPS="$(mktemp)"
+        CC=${HOST_CC} cc_get_header_deps ${INCDIR} ${SRCS} >${DEPS} || \
+            die "Failure getting dependencies of host headers"
+        # cpio will fail if CRT_INCDIR is below a symlink, so squash that
+        CRT_INCDIR="$(readlink -f ${CRT_INCDIR})"
+        Q=
+        [ "${CONFIG_HOST}" = "FreeBSD" ] && Q="--quiet"
+        (cd ${INCDIR} && cpio ${Q} -Lpdm ${CRT_INCDIR} <${DEPS}) || \
+            die "Failure copying host headers"
+        rm ${DEPS}
+        ;;
+esac
+
+L="$PWD/toolchain/lib/${CONFIG_TARGET_SPEC}"
+mkdir -p ${L}
+[ -n "${CONFIG_HVT}" ] && ln -s ../../../bindings/hvt/solo5_hvt.lds ${L}/solo5_hvt.lds
+[ -n "${CONFIG_HVT}" ] && ln -s ../../../bindings/hvt/solo5_hvt.o ${L}/solo5_hvt.o
+[ -n "${CONFIG_SPT}" ] && ln -s ../../../bindings/spt/solo5_spt.lds ${L}/solo5_spt.lds
+[ -n "${CONFIG_SPT}" ] && ln -s ../../../bindings/spt/solo5_spt.o ${L}/solo5_spt.o
+[ -n "${CONFIG_VIRTIO}" ] && ln -s ../../../bindings/virtio/solo5_virtio.lds ${L}/solo5_virtio.lds
+[ -n "${CONFIG_VIRTIO}" ] && ln -s ../../../bindings/virtio/solo5_virtio.o ${L}/solo5_virtio.o
+[ -n "${CONFIG_MUEN}" ] && ln -s ../../../bindings/muen/solo5_muen.lds ${L}/solo5_muen.lds
+[ -n "${CONFIG_MUEN}" ] && ln -s ../../../bindings/muen/solo5_muen.o ${L}/solo5_muen.o
+[ -n "${CONFIG_XEN}" ] && ln -s ../../../bindings/xen/solo5_xen.lds ${L}/solo5_xen.lds
+[ -n "${CONFIG_XEN}" ] && ln -s ../../../bindings/xen/solo5_xen.o ${L}/solo5_xen.o
+
 T="toolchain/bin"
 mkdir -p ${T}
 cat >"${T}/${CONFIG_TARGET_SPEC}-cc" <<EOM
 #!/bin/sh
+I="\$(dirname \$0)/../include"
+[ ! -d "\${I}" ] && echo "\$0: Could not determine include path" 1>&2 && exit 1
 exec ${TARGET_CC} \
     --target=${CONFIG_TARGET_CLANG} \
-    -nostdlibinc \
+    -nostdlibinc -isystem \${I}/${CONFIG_TARGET_SPEC} -I \${I}/solo5 \
     -ffreestanding \
     -fstack-protector-strong \
     "\$@"
@@ -319,10 +344,26 @@ EOM
 chmod +x "${T}/${CONFIG_TARGET_SPEC}-cc"
 cat >"${T}/${CONFIG_TARGET_SPEC}-ld" <<EOM
 #!/bin/sh
+L="\$(dirname \$0)/../lib/${CONFIG_TARGET_SPEC}"
+[ ! -d "\${L}" ] && echo "\$0: Could not determine library path" 1>&2 && exit 1
+B=
+for arg do
+    shift
+    case "\$arg" in
+        --solo5=*)
+            B="\${arg##*=}"
+            continue
+        ;;
+    esac
+    set -- "\$@" "\$arg"
+done
+[ -n "\${B}" ] && B="-T solo5_\${B}.lds -l :solo5_\${B}.o"
 exec ${TARGET_LD} \
     -nostdlib \
+    -L \${L} \
     -z max-page-size=${CONFIG_TARGET_LD_MAX_PAGE_SIZE} \
     -static \
+    \${B} \
     "\$@"
 EOM
 chmod +x "${T}/${CONFIG_TARGET_SPEC}-ld"

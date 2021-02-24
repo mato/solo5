@@ -40,8 +40,7 @@ manifest.c: manifest.json $(TOPDIR)/include/mft_abi.h $(ELFTOOL)
 ifdef CONFIG_HVT
 %.hvt: %.o manifest.o
 	@echo "LD $@"
-	$(LD) $(LDFLAGS) -T $(TOPDIR)/bindings/hvt/solo5_hvt.lds \
-	    $(TOPDIR)/bindings/hvt/solo5_hvt.o \
+	$(LD) $(LDFLAGS) --solo5=hvt \
 	    $< manifest.o -o $@
 
 all_TARGETS += $(test_NAME).hvt
@@ -50,8 +49,7 @@ endif
 ifdef CONFIG_SPT
 %.spt: %.o manifest.o
 	@echo "LD $@"
-	$(LD) $(LDFLAGS) -T $(TOPDIR)/bindings/spt/solo5_spt.lds \
-	    $(TOPDIR)/bindings/spt/solo5_spt.o \
+	$(LD) $(LDFLAGS) --solo5=spt \
 	    $< manifest.o -o $@
 
 all_TARGETS += $(test_NAME).spt
@@ -59,8 +57,7 @@ endif
 
 ifdef CONFIG_VIRTIO
 %.virtio: %.o manifest.o
-	$(LD) $(LDFLAGS) -T $(TOPDIR)/bindings/virtio/solo5_virtio.lds \
-	    $(TOPDIR)/bindings/virtio/solo5_virtio.o \
+	$(LD) $(LDFLAGS) --solo5=virtio \
 	    $< manifest.o -o $@
 
 all_TARGETS += $(test_NAME).virtio
@@ -68,8 +65,7 @@ endif
 
 ifdef CONFIG_MUEN
 %.muen: %.o manifest.o
-	$(LD) $(LDFLAGS) -T $(TOPDIR)/bindings/muen/solo5_muen.lds \
-	    $(TOPDIR)/bindings/muen/solo5_muen.o \
+	$(LD) $(LDFLAGS) --solo5=muen \
 	    $< manifest.o -o $@
 
 all_TARGETS += $(test_NAME).muen
@@ -77,8 +73,7 @@ endif
 
 ifdef CONFIG_XEN
 %.xen: %.o manifest.o
-	$(LD) $(LDFLAGS) -T $(TOPDIR)/bindings/xen/solo5_xen.lds \
-	    $(TOPDIR)/bindings/xen/solo5_xen.o \
+	$(LD) $(LDFLAGS) --solo5=xen \
 	    $< manifest.o -o $@
 
 %.xl: %.xen

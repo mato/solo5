@@ -64,6 +64,9 @@ setup() {
     ;;
   *virtio)
     [ -z "${CONFIG_VIRTIO}" ] && skip
+    [ "${CONFIG_HOST}" = "FreeBSD" ] && \
+      [ ! -x "$(command -v grub2-bhyve)" ] && \
+      skip "grub2-bhyve not available"
     [ "${CONFIG_HOST}" = "OpenBSD" ] && skip
     VIRTIO=../scripts/virtio-run/solo5-virtio-run.sh
     ;;
@@ -198,7 +201,9 @@ xen_expect_abort() {
   FreeBSD)
     # XXX: imgact_elf.c:load_interp() outputs the "ELF interpreter ... not
     # found" using uprintf() here, so we can't test for it. Boo.
-    [ "$status" -eq 134 ]
+    # Clang-targeted toolchains now produce generic ELF which gives "Exec format error",
+    # so also test for that case (126) and treat it as success.
+    [ "$status" -eq 134 ] || [ "$status" -eq 126 ]
     ;;
   OpenBSD)
     # XXX: Unclear why the "Abort trap" is not showing up in the output.
