@@ -28,7 +28,7 @@ all_TARGETS :=
 .SUFFIXES:
 $(V).SILENT:
 
-common_SRCS := abort.c cpu_$(CONFIG_ARCH).c cpu_vectors_$(CONFIG_ARCH).S \
+common_SRCS := abort.c cpu_$(CONFIG_TARGET_ARCH).c cpu_vectors_$(CONFIG_TARGET_ARCH).S \
     crt.c printf.c intr.c lib.c mem.c exit.c log.c cmdline.c tls.c mft.c
 
 common_hvt_SRCS := hvt/platform.c hvt/platform_intr.c hvt/time.c
@@ -44,7 +44,7 @@ hvt_SRCS := hvt/start.c $(common_SRCS) $(common_hvt_SRCS) \
 spt_SRCS := spt/start.c \
     abort.c crt.c printf.c lib.c mem.c exit.c log.c cmdline.c tls.c mft.c \
     spt/bindings.c spt/block.c spt/net.c spt/platform.c \
-    spt/sys_linux_$(CONFIG_ARCH).c
+    spt/sys_linux_$(CONFIG_TARGET_ARCH).c
 
 virtio_SRCS := virtio/boot.S virtio/start.c $(common_SRCS) \
     virtio/platform.c virtio/platform_intr.c \
@@ -63,7 +63,7 @@ xen_SRCS := xen/boot.S xen/start.c $(common_SRCS) \
 
 CPPFLAGS+=-D__SOLO5_BINDINGS__
 
-ifeq ($(CONFIG_ARCH), x86_64)
+ifeq ($(CONFIG_TARGET_ARCH), x86_64)
 # Prevent the compiler from adding optimizations that use shared FPU state.
 # This is necessary for early boot code and trap handlers.
 CFLAGS+=-mno-sse -mno-mmx -mno-aes -mno-avx -mno-red-zone
@@ -82,13 +82,8 @@ all_TARGETS :=
 all_OBJS :=
 all_SRCS :=
 
-ifeq ($(CONFIG_HOST), OpenBSD)
-SSP_GUARD=__guard_local
-SSP_FAIL=__stack_smash_handler
-else
 SSP_GUARD=__stack_chk_guard
 SSP_FAIL=__stack_chk_fail
-endif
 define LINK.bindings
 	@echo "LD $@"
 	$(LD) -r $(LDFLAGS) $^ -o $@
@@ -99,10 +94,10 @@ endef
 ifdef CONFIG_HVT
     hvt_OBJS := $(patsubst %.c,%.o,$(patsubst %.S,%.o,$(hvt_SRCS)))
 
-hvt/solo5_hvt.o: $(hvt_OBJS)
+solo5_hvt.o: $(hvt_OBJS)
 	$(LINK.bindings)
 
-    all_TARGETS += hvt/solo5_hvt.o
+    all_TARGETS += solo5_hvt.o
     all_OBJS += $(hvt_OBJS)
     all_SRCS += $(hvt_SRCS)
 endif
@@ -110,10 +105,10 @@ endif
 ifdef CONFIG_SPT
     spt_OBJS := $(patsubst %.c,%.o,$(patsubst %.S,%.o,$(spt_SRCS)))
 
-spt/solo5_spt.o: $(spt_OBJS)
+solo5_spt.o: $(spt_OBJS)
 	$(LINK.bindings)
 
-    all_TARGETS += spt/solo5_spt.o
+    all_TARGETS += solo5_spt.o
     all_OBJS += $(spt_OBJS)
     all_SRCS += $(spt_SRCS)
 endif
@@ -121,10 +116,10 @@ endif
 ifdef CONFIG_VIRTIO
     virtio_OBJS := $(patsubst %.c,%.o,$(patsubst %.S,%.o,$(virtio_SRCS)))
 
-virtio/solo5_virtio.o: $(virtio_OBJS)
+solo5_virtio.o: $(virtio_OBJS)
 	$(LINK.bindings)
 
-    all_TARGETS += virtio/solo5_virtio.o
+    all_TARGETS += solo5_virtio.o
     all_OBJS += $(virtio_OBJS)
     all_SRCS += $(virtio_SRCS)
 endif
@@ -132,10 +127,10 @@ endif
 ifdef CONFIG_MUEN
     muen_OBJS := $(patsubst %.c,%.o,$(patsubst %.S,%.o,$(muen_SRCS)))
 
-muen/solo5_muen.o: $(muen_OBJS)
+solo5_muen.o: $(muen_OBJS)
 	$(LINK.bindings)
 
-    all_TARGETS += muen/solo5_muen.o
+    all_TARGETS += solo5_muen.o
     all_OBJS += $(muen_OBJS)
     all_SRCS += $(muen_SRCS)
 endif
@@ -143,15 +138,14 @@ endif
 ifdef CONFIG_XEN
     xen_OBJS := $(patsubst %.c,%.o,$(patsubst %.S,%.o,$(xen_SRCS)))
 
-xen/solo5_xen.o: $(xen_OBJS)
+solo5_xen.o: $(xen_OBJS)
 	$(LINK.bindings)
 
-    all_TARGETS += xen/solo5_xen.o
+    all_TARGETS += solo5_xen.o
     all_OBJS += $(xen_OBJS)
     all_SRCS += $(xen_SRCS)
 
-CPPFLAGS+=-D__XEN_INTERFACE_VERSION__=__XEN_LATEST_INTERFACE_VERSION__ \
-	  -I$(TOPDIR)/include/xen
+CPPFLAGS+=-D__XEN_INTERFACE_VERSION__=__XEN_LATEST_INTERFACE_VERSION__
 endif
 
 all: $(all_TARGETS)

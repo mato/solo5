@@ -54,7 +54,7 @@ do_basic()
         # XXX grub-bhyve is unstable under nested virt, so don't run the
         # virtio tests on FreeBSD.
         if [ "$(uname -s)" = "FreeBSD" ]; then
-            echo CONFIG_VIRTIO= >>Makeconf
+            echo CONFIG_VIRTIO= >>Makeconf.sh
         fi
         try ${SURF_SUDO} tests/setup-tests.sh
         try ${SURF_SUDO} tests/run-tests.sh
@@ -84,13 +84,10 @@ do_basic()
             fi
         fi
     fi
+    message "Testing 'make install'."
+    try ${MAKE} install DESTDIR=/tmp/install
     message "Testing 'make distrib'."
     try ${MAKE} distrib
-    message "Testing tools only build."
-    try ${MAKE} distclean
-    try ./configure.sh --only-tools
-    try ${MAKE}
-    try ${SURF_SUDO} ${MAKE} install-tools
 }
 
 do_e2e()

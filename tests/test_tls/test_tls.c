@@ -37,7 +37,9 @@
  *
  * In both cases just compile a dummy and disable this test in tests.bats.
  */
-#if defined(__OpenBSD__) || defined(__FreeBSD__)
+/* XXX The above actually applies to any toolchain using lld. Either disable this
+ * test entirely or fix the linker scripts? */
+#if defined(__clang__)
 
 int solo5_app_main(const struct solo5_start_info *si __attribute__((unused)))
 {
