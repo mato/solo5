@@ -498,7 +498,7 @@ I="\$(dirname \$0)/../include"
 exec ${TARGET_CC} \
     --target=${CONFIG_TARGET_CLANG} \
     -nostdlibinc -isystem \${I}/${CONFIG_TARGET_SPEC} -I \${I}/solo5 \
-    -ffreestanding \
+    -ffreestanding -D__ELF__ \
     -fstack-protector-strong \
     "\$@"
 EOM
