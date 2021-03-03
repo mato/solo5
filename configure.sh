@@ -450,13 +450,50 @@ cat >"${T}/${CONFIG_TARGET_SPEC}-cc" <<EOM
 #!/bin/sh
 I="\$(dirname \$0)/../include"
 [ ! -d "\${I}" ] && echo "\$0: Could not determine include path" 1>&2 && exit 1
-[ -n "\${__V}" ] && set -x
-exec ${TARGET_CC} \
-    ${TARGET_EXTRA_CFLAGS} \
-    -isystem \${I}/${CONFIG_TARGET_SPEC} -I \${I}/solo5 \
-    -ffreestanding \
-    -fstack-protector-strong \
-    "\$@"
+L="\$(dirname \$0)/../lib/${CONFIG_TARGET_SPEC}"
+[ ! -d "\${L}" ] && echo "\$0: Could not determine library path" 1>&2 && exit 1
+M=link
+B=stub
+for arg do
+    shift
+    case "\$arg" in
+        -c|-S|-E)
+            M=compile
+            ;;
+        --solo5-abi=*)
+            B="\${arg##*=}"
+            continue
+        ;;
+    esac
+    set -- "\$@" "\$arg"
+done
+case \${M} in
+    compile)
+        [ -n "\${__V}" ] && set -x
+        exec ${TARGET_CC} \
+            ${TARGET_EXTRA_CFLAGS} \
+            -isystem \${I}/${CONFIG_TARGET_SPEC} -I \${I}/solo5 \
+            -ffreestanding \
+            -fstack-protector-strong \
+            "\$@"
+        ;;
+    link)
+        [ -n "\${B}" ] && B="-T solo5_\${B}.lds -l :solo5_\${B}.o"
+        [ -n "\${__V}" ] && set -x
+        exec ${TARGET_CC} \
+            ${TARGET_EXTRA_CFLAGS} \
+            -isystem \${I}/${CONFIG_TARGET_SPEC} -I \${I}/solo5 \
+            -ffreestanding \
+            -fstack-protector-strong \
+            -nostdlib \
+            -L \${L} \
+            \${B} \
+            -z max-page-size=${CONFIG_TARGET_LD_MAX_PAGE_SIZE} \
+            -Wl,--build-id=none \
+            -static \
+            "\$@"
+        ;;
+esac
 EOM
 chmod +x "${T}/${CONFIG_TARGET_SPEC}-cc"
 cat >"${T}/${CONFIG_TARGET_SPEC}-ld" <<EOM

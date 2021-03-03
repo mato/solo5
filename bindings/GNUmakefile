@@ -37,6 +37,8 @@ common_hvt_SRCS := hvt/platform.c hvt/platform_intr.c hvt/time.c
 # Note that the module defining _start should be listed first in <target>_SRCS,
 # in order to ensure that _start has a stable address (required for Muen).
 #
+stub_SRCS := stub/stubs.c
+
 hvt_SRCS := hvt/start.c $(common_SRCS) $(common_hvt_SRCS) \
     hvt/platform_lifecycle.c hvt/yield.c hvt/tscclock.c hvt/console.c \
     hvt/net.c hvt/block.c
@@ -90,6 +92,15 @@ define LINK.bindings
 	@echo "OBJCOPY $@"
 	$(OBJCOPY) -w -G solo5_\* -G _start\* -G $(SSP_GUARD) -G $(SSP_FAIL) $@ $@
 endef
+
+    stub_OBJS := $(patsubst %.c,%.o,$(patsubst %.S,%.o,$(stub_SRCS)))
+
+solo5_stub.o: $(stub_OBJS)
+	$(LINK.bindings)
+
+    all_TARGETS += solo5_stub.o
+    all_OBJS += $(stub_OBJS)
+    all_SRCS += $(stub_SRCS)
 
 ifdef CONFIG_HVT
     hvt_OBJS := $(patsubst %.c,%.o,$(patsubst %.S,%.o,$(hvt_SRCS)))

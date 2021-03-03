@@ -37,42 +37,48 @@ manifest.c: manifest.json $(TOPDIR)/include/mft_abi.h $(ELFTOOL)
 	@echo "CC $@"
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
+%.stub: %.o manifest.o
+	@echo "CCLD $@"
+	$(CC) $< manifest.o -o $@
+
+all_TARGETS += $(test_NAME).stub
+
 ifdef CONFIG_HVT
 %.hvt: %.o manifest.o
-	@echo "LD $@"
-	$(LD) $(LDFLAGS) --solo5-abi=hvt $< manifest.o -o $@
+	@echo "CCLD $@"
+	$(CC) --solo5-abi=hvt $< manifest.o -o $@
 
 all_TARGETS += $(test_NAME).hvt
 endif
 
 ifdef CONFIG_SPT
 %.spt: %.o manifest.o
-	@echo "LD $@"
-	$(LD) $(LDFLAGS) --solo5-abi=spt $< manifest.o -o $@
+	@echo "CCLD $@"
+	$(CC) --solo5-abi=spt $< manifest.o -o $@
 
 all_TARGETS += $(test_NAME).spt
 endif
 
 ifdef CONFIG_VIRTIO
 %.virtio: %.o manifest.o
-	@echo "LD $@"
-	$(LD) $(LDFLAGS) --solo5-abi=virtio $< manifest.o -o $@
+	@echo "CCLD $@"
+	$(CC) --solo5-abi=virtio $< manifest.o -o $@
 
 all_TARGETS += $(test_NAME).virtio
 endif
 
 ifdef CONFIG_MUEN
 %.muen: %.o manifest.o
-	@echo "LD $@"
-	$(LD) $(LDFLAGS) --solo5-abi=muen $< manifest.o -o $@
+	@echo "CCLD $@"
+	$(CC) --solo5-abi=muen $< manifest.o -o $@
 
 all_TARGETS += $(test_NAME).muen
 endif
 
 ifdef CONFIG_XEN
 %.xen: %.o manifest.o
-	@echo "LD $@"
-	$(LD) $(LDFLAGS) --solo5-abi=xen $< manifest.o -o $@
+	@echo "CCLD $@"
+	$(CC) --solo5-abi=xen $< manifest.o -o $@
 
 %.xl: %.xen
 	@echo "SUBST $@"

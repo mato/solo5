@@ -124,6 +124,8 @@ install-toolchain: build
 	    find . -type d -exec mkdir -p "$(TOOLCHAIN_INCDIR)/{}" \; && \
 	    find . -type f -name '*.h' -exec $(INSTALL) -m 0644 \
 	    "{}" "$(TOOLCHAIN_INCDIR)/{}" \;
+	$(INSTALL) -m 0644 bindings/solo5_stub.o $(TOOLCHAIN_LIBDIR)
+	$(INSTALL) -m 0644 bindings/solo5_stub.lds $(TOOLCHAIN_LIBDIR)
 ifdef CONFIG_HVT
 	$(INSTALL) -m 0644 bindings/solo5_hvt.o $(TOOLCHAIN_LIBDIR)
 	$(INSTALL) -m 0644 bindings/solo5_hvt.lds $(TOOLCHAIN_LIBDIR)
