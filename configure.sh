@@ -223,16 +223,12 @@ EOM
 }
 
 OPT_PREFIX=/usr/local
-OPT_TARGET=
 while [ $# -gt 0 ]; do
     OPT="$1"
 
     case "${OPT}" in
         --prefix=*)
             OPT_PREFIX="${OPT##*=}"
-            ;;
-        --target=*)
-            OPT_TARGET="${OPT##*=}"
             ;;
         --help)
             usage
@@ -328,8 +324,7 @@ if [ "${CONFIG_HOST}" = "FreeBSD" -a -n "${CONFIG_HVT_TENDER}" ]; then
     [ "$(uname -K)" -ge 1200086 ] && CONFIG_HVT_TENDER_FREEBSD_ENABLE_CAPSICUM=1
 fi
 
-[ -z "${OPT_TARGET}" ] && OPT_TARGET=${CONFIG_HOST_ARCH}
-TARGET_CC="${TARGET_CC:-clang} --target=${OPT_TARGET}-unknown-none"
+TARGET_CC="${TARGET_CC:-cc}"
 
 echo -n "${prog_NAME}: Checking that ${TARGET_CC} works: "
 cat >conftmp.c <<EOM
@@ -372,88 +367,34 @@ echo "${prog_NAME}: Using ${TARGET_CC} for target compiler"
 # TODO Can we simplify this a bit more somehow?
 case ${CONFIG_HOST} in
     Linux)
-        # Ah, the wonders of different Linux distributions and LLVM versions.
-        # If the user did not specify a TARGET_LD, try and find one that
-        # will work.
-        if [ -z "${TARGET_LD}" ]; then
-            if CC=${TARGET_CC} LD=ld.lld check_ld; then
-                TARGET_LD=ld.lld
-            elif CC=${TARGET_CC} LD=ld check_ld; then
-                TARGET_LD=ld
-            else
-                err "Could not find a working linker for ${OPT_TARGET}"
-                die "Try running with TARGET_LD set to a compatible linker"
-            fi
-        fi
-        # If the user did not specify a TARGET_OBJCOPY, try and find one that
-        # will work.
-        if [ -z "${TARGET_OBJCOPY}" ]; then
-            if CC=${TARGET_CC} OBJCOPY=llvm-objcopy check_objcopy; then
-                TARGET_OBJCOPY=llvm-objcopy
-            elif CC=${TARGET_CC} OBJCOPY=objcopy check_objcopy; then
-                TARGET_OBJCOPY=objcopy
-            else
-                err "Could not find a working objcopy for ${OPT_TARGET}"
-                die "Try running with TARGET_OBJCOPY set to a compatible objcopy"
-            fi
-        fi
+        TARGET_LD="${TARGET_LD:-ld}"
+        TARGET_OBJCOPY="${TARGET_OBJCOPY:-objcopy}"
         ;;
     FreeBSD)
-        # FreeBSD 12+ has LLVM 8+ and an objcopy that works, so just use them,
-        # but test them anyway unless explicitly overriden.
-        if [ -z "${TARGET_LD}" ]; then
-            if CC=${TARGET_CC} LD=ld check_ld; then
-                TARGET_LD=ld
-            else
-                err "Could not find a working linker for ${OPT_TARGET}"
-                die "Try running with TARGET_LD set to a compatible linker"
-            fi
-        fi
-        if [ -z "${TARGET_OBJCOPY}" ]; then
-            if CC=${TARGET_CC} OBJCOPY=objcopy check_objcopy; then
-                TARGET_OBJCOPY=objcopy
-            else
-                err "Could not find a working objcopy for ${OPT_TARGET}"
-                die "Try running with TARGET_OBJCOPY set to a compatible objcopy"
-            fi
-        fi
+        TARGET_LD="${TARGET_LD:-ld}"
+        TARGET_OBJCOPY="${TARGET_OBJCOPY:-objcopy}"
         ;;
     OpanBSD)
-        # OpenBSD (since ?) has LLVM (version ?) and an objcopy that works, so
-        # just use them, but test them anyway unless explicitly overriden.
-        if [ -z "${TARGET_LD}" ]; then
-            if CC=${TARGET_CC} LD=ld.lld check_ld; then
-                TARGET_LD=ld.lld
-            else
-                err "Could not find a working linker for ${OPT_TARGET}"
-                die "Try running with TARGET_LD set to a compatible linker"
-            fi
-        fi
-        if [ -z "${TARGET_OBJCOPY}" ]; then
-            if CC=${TARGET_CC} OBJCOPY=objcopy check_objcopy; then
-                TARGET_OBJCOPY=objcopy
-            else
-                err "Could not find a working objcopy for ${OPT_TARGET}"
-                die "Try running with TARGET_OBJCOPY set to a compatible objcopy"
-            fi
+        TARGET_LD="${TARGET_LD:-ld.lld}"
+        TARGET_OBJCOPY="${TARGET_OBJCOPY:-objcopy}"
+        if ! LD="${TARGET_LD}" ld_is_lld; then
+            warn "${TARGET_LD} is not LLVM LLD, proceeding anyway"
         fi
         ;;
     *)
         die "Unsupported host system: ${CONFIG_HOST}"
         ;;
 esac
-if ! LD="${TARGET_LD}" ld_is_lld; then
-    warn "${TARGET_LD} is not LLVM LLD, proceeding anyway"
+if ! CC="${TARGET_CC}" LD="${TARGET_LD}" check_ld; then
+    die "Could not find a working target linker"
+fi
+if ! CC="${TARGET_CC}" OBJCOPY="${TARGET_OBJCOPY}" check_objcopy; then
+    die "Could not find a working target objcopy"
 fi
 echo "${prog_NAME}: Using ${TARGET_LD} for target linker"
 echo "${prog_NAME}: Using ${TARGET_OBJCOPY} for target objcopy"
-# TODO ex config_host_openbsd()
-# no longer required with clang --target?
-# CONFIG_CFLAGS="${CONFIG_CFLAGS} -mno-retpoline -fno-ret-protector -nostdlibinc"
-# CONFIG_LDFLAGS="${CONFIG_LDFLAGS} -nopie"
 
 CONFIG_TARGET_SPEC="${CONFIG_TARGET_ARCH}-solo5-none-static"
-CONFIG_TARGET_CLANG="${CONFIG_TARGET_ARCH}-unknown-none"
 echo "${prog_NAME}: Target toolchain spec is ${CONFIG_TARGET_SPEC}"
 
 [ -d "$PWD/toolchain" ] && die "toolchain/ already exists, run make distclean"
@@ -464,14 +405,28 @@ ln -s ../../include $PWD/toolchain/include/solo5
 # Unlike Linux, the BSDs don't ship some standard headers that we need in
 # Clang's resource directory. Appropriate these from the host system.
 # TODO XXX Are these fine for cross-ARCH compliation?
+# TODO ex config_host_openbsd()
+# CONFIG_CFLAGS="${CONFIG_CFLAGS} -mno-retpoline -fno-ret-protector -nostdlibinc"
+# CONFIG_LDFLAGS="${CONFIG_LDFLAGS} -nopie"
+
+TARGET_EXTRA_CFLAGS=
 CRT_INCDIR=$PWD/toolchain/include/${CONFIG_TARGET_SPEC}
 mkdir -p ${CRT_INCDIR}
 case ${HOST_CC_MACHINE} in
+    *linux*)
+        CC="${TARGET_CC}" cc_is_gcc || die "Only gcc is supported on Linux"
+        CC_INCDIR="$(${TARGET_CC} -print-file-name=include)"
+        [ -d "${CC_INCDIR}" ] || die "Cannot determine gcc include directory"
+        cp -R "${CC_INCDIR}/." ${CRT_INCDIR}
+        # XXX
+        TARGET_EXTRA_CFLAGS="-nostdinc -mstack-protector-guard=global"
+        ;;
     *freebsd*|*openbsd*)
+        CC="${TARGET_CC}" cc_is_clang || die "Only clang is supported on *BSD"
         INCDIR=/usr/include
         SRCS="float.h stddef.h stdint.h stdbool.h stdarg.h"
         DEPS="$(mktemp)"
-        CC=${HOST_CC} cc_get_header_deps ${INCDIR} ${SRCS} >${DEPS} || \
+        CC=${TARGET_CC} cc_get_header_deps ${INCDIR} ${SRCS} >${DEPS} || \
             die "Failure getting dependencies of host headers"
         # cpio will fail if CRT_INCDIR is below a symlink, so squash that
         CRT_INCDIR="$(readlink -f ${CRT_INCDIR})"
@@ -480,6 +435,7 @@ case ${HOST_CC_MACHINE} in
         (cd ${INCDIR} && cpio ${Q} -Lpdm ${CRT_INCDIR} <${DEPS}) || \
             die "Failure copying host headers"
         rm ${DEPS}
+        TARGET_EXTRA_CFLAGS="-nostdlibinc"
         ;;
 esac
 
@@ -496,9 +452,9 @@ I="\$(dirname \$0)/../include"
 [ ! -d "\${I}" ] && echo "\$0: Could not determine include path" 1>&2 && exit 1
 [ -n "\${__V}" ] && set -x
 exec ${TARGET_CC} \
-    --target=${CONFIG_TARGET_CLANG} \
-    -nostdlibinc -isystem \${I}/${CONFIG_TARGET_SPEC} -I \${I}/solo5 \
-    -ffreestanding -D__ELF__ \
+    ${TARGET_EXTRA_CFLAGS} \
+    -isystem \${I}/${CONFIG_TARGET_SPEC} -I \${I}/solo5 \
+    -ffreestanding \
     -fstack-protector-strong \
     "\$@"
 EOM
