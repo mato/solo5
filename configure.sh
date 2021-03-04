@@ -115,26 +115,6 @@ ld_is_lld()
     ${LD} --version 2>&1 | grep -q '^LLD'
 }
 
-# Arguments: PATH, FILES...
-# For the header FILES..., all of which must be relative to PATH, resolve their
-# dependencies using the C preprocessor and output a list of FILES... plus all
-# their unique dependencies, also relative to PATH.
-cc_get_header_deps()
-{
-    temp="$PWD/conftmp.d"
-    local path="$1"
-    shift
-    (
-        cd ${path} || return 1
-        ${CC} -M "$@" >${temp} || return 1
-        sed -e 's!.*\.o:!!g' -e "s!${path}/!!g" ${temp} \
-            | tr ' \\' '\n' \
-            | sort \
-            | uniq
-        rm ${temp}
-    )
-}
-
 # Check that the linker ${LD} is available and suitable for our purposes.
 check_ld()
 {
@@ -378,8 +358,12 @@ case ${CONFIG_HOST} in
         TARGET_LD="${TARGET_LD:-ld.lld}"
         TARGET_OBJCOPY="${TARGET_OBJCOPY:-objcopy}"
         if ! LD="${TARGET_LD}" ld_is_lld; then
-            warn "${TARGET_LD} is not LLVM LLD, proceeding anyway"
+            err "${TARGET_LD} is not LLVM LLD"
+            die "Using GNU LD is not supported on OpenBSD"
         fi
+        # TODO ex config_host_openbsd()
+        # CONFIG_CFLAGS="${CONFIG_CFLAGS} -mno-retpoline -fno-ret-protector -nostdlibinc"
+        # CONFIG_LDFLAGS="${CONFIG_LDFLAGS} -nopie"
         ;;
     *)
         die "Unsupported host system: ${CONFIG_HOST}"
@@ -397,139 +381,19 @@ echo "${prog_NAME}: Using ${TARGET_OBJCOPY} for target objcopy"
 CONFIG_TARGET_TRIPLE="${CONFIG_TARGET_ARCH}-solo5-none-static"
 echo "${prog_NAME}: Target toolchain triple is ${CONFIG_TARGET_TRIPLE}"
 
-[ -d "$PWD/toolchain" ] && die "toolchain/ already exists, run make distclean"
-
-mkdir -p $PWD/toolchain/include
-ln -s ../../include $PWD/toolchain/include/solo5
-
-# Unlike Linux, the BSDs don't ship some standard headers that we need in
-# Clang's resource directory. Appropriate these from the host system.
-# TODO XXX Are these fine for cross-ARCH compliation?
-# TODO ex config_host_openbsd()
-# CONFIG_CFLAGS="${CONFIG_CFLAGS} -mno-retpoline -fno-ret-protector -nostdlibinc"
-# CONFIG_LDFLAGS="${CONFIG_LDFLAGS} -nopie"
-
-TARGET_EXTRA_CFLAGS=
-CRT_INCDIR=$PWD/toolchain/include/${CONFIG_TARGET_TRIPLE}
-mkdir -p ${CRT_INCDIR}
-case ${HOST_CC_MACHINE} in
-    *linux*)
-        CC="${TARGET_CC}" cc_is_gcc || die "Only gcc is supported on Linux"
-        CC_INCDIR="$(${TARGET_CC} -print-file-name=include)"
-        [ -d "${CC_INCDIR}" ] || die "Cannot determine gcc include directory"
-        cp -R "${CC_INCDIR}/." ${CRT_INCDIR}
-        # XXX
-        TARGET_EXTRA_CFLAGS="-nostdinc -mstack-protector-guard=global"
-        ;;
-    *freebsd*|*openbsd*)
-        CC="${TARGET_CC}" cc_is_clang || die "Only clang is supported on *BSD"
-        INCDIR=/usr/include
-        SRCS="float.h stddef.h stdint.h stdbool.h stdarg.h"
-        DEPS="$(mktemp)"
-        CC=${TARGET_CC} cc_get_header_deps ${INCDIR} ${SRCS} >${DEPS} || \
-            die "Failure getting dependencies of host headers"
-        # cpio will fail if CRT_INCDIR is below a symlink, so squash that
-        CRT_INCDIR="$(readlink -f ${CRT_INCDIR})"
-        Q=
-        [ "${CONFIG_HOST}" = "FreeBSD" ] && Q="--quiet"
-        (cd ${INCDIR} && cpio ${Q} -Lpdm ${CRT_INCDIR} <${DEPS}) || \
-            die "Failure copying host headers"
-        rm ${DEPS}
-        TARGET_EXTRA_CFLAGS="-nostdlibinc"
+CONFIG_TARGET_CC_CFLAGS=
+if CC="${TARGET_CC}" cc_is_clang; then
+    CONFIG_TARGET_CC_CFLAGS=-nostdlibinc
+else
+    CONFIG_TARGET_CC_CFLAGS=-nostdinc
+fi
+case ${TARGET_CC_MACHINE} in
+    x86_64-*linux*|ppc64-*linux*)
+        CC="${TARGET_CC}" cc_check_option -mstack-protector-guard=global || \
+            die "${TARGET_CC} does not support -mstack-protector-guard="
+        CONFIG_TARGET_CC_CFLAGS="${CONFIG_TARGET_CC_CFLAGS} -mstack-protector-guard=global"
         ;;
 esac
-
-L="$PWD/toolchain/lib"
-mkdir -p ${L}
-ln -s ../../bindings ${L}/${CONFIG_TARGET_TRIPLE}
-
-# TODO generate these wrappers using a Makefile and sed, avoiding too many \s
-T="toolchain/bin"
-mkdir -p ${T}
-cat >"${T}/${CONFIG_TARGET_TRIPLE}-cc" <<EOM
-#!/bin/sh
-I="\$(dirname \$0)/../include"
-[ ! -d "\${I}" ] && echo "\$0: Could not determine include path" 1>&2 && exit 1
-L="\$(dirname \$0)/../lib/${CONFIG_TARGET_TRIPLE}"
-[ ! -d "\${L}" ] && echo "\$0: Could not determine library path" 1>&2 && exit 1
-M=link
-B=stub
-for arg do
-    shift
-    case "\$arg" in
-        -c|-S|-E)
-            M=compile
-            ;;
-        --solo5-abi=*)
-            B="\${arg##*=}"
-            continue
-        ;;
-    esac
-    set -- "\$@" "\$arg"
-done
-case \${M} in
-    compile)
-        [ -n "\${__V}" ] && set -x
-        exec ${TARGET_CC} \
-            ${TARGET_EXTRA_CFLAGS} \
-            -isystem \${I}/${CONFIG_TARGET_TRIPLE} -I \${I}/solo5 \
-            -ffreestanding \
-            -fstack-protector-strong \
-            "\$@"
-        ;;
-    link)
-        [ -n "\${B}" ] && B="-T solo5_\${B}.lds -l :solo5_\${B}.o"
-        [ -n "\${__V}" ] && set -x
-        exec ${TARGET_CC} \
-            ${TARGET_EXTRA_CFLAGS} \
-            -isystem \${I}/${CONFIG_TARGET_TRIPLE} -I \${I}/solo5 \
-            -ffreestanding \
-            -fstack-protector-strong \
-            -nostdlib \
-            -L \${L} \
-            \${B} \
-            -z max-page-size=${CONFIG_TARGET_LD_MAX_PAGE_SIZE} \
-            -Wl,--build-id=none \
-            -static \
-            "\$@"
-        ;;
-esac
-EOM
-chmod +x "${T}/${CONFIG_TARGET_TRIPLE}-cc"
-cat >"${T}/${CONFIG_TARGET_TRIPLE}-ld" <<EOM
-#!/bin/sh
-L="\$(dirname \$0)/../lib/${CONFIG_TARGET_TRIPLE}"
-[ ! -d "\${L}" ] && echo "\$0: Could not determine library path" 1>&2 && exit 1
-B=
-for arg do
-    shift
-    case "\$arg" in
-        --solo5-abi=*)
-            B="\${arg##*=}"
-            continue
-        ;;
-    esac
-    set -- "\$@" "\$arg"
-done
-[ -n "\${B}" ] && B="-T solo5_\${B}.lds -l :solo5_\${B}.o"
-[ -n "\${__V}" ] && set -x
-exec ${TARGET_LD} \
-    -nostdlib \
-    -L \${L} \
-    -z max-page-size=${CONFIG_TARGET_LD_MAX_PAGE_SIZE} \
-    -static \
-    \${B} \
-    "\$@"
-EOM
-chmod +x "${T}/${CONFIG_TARGET_TRIPLE}-ld"
-cat >"${T}/${CONFIG_TARGET_TRIPLE}-objcopy" <<EOM
-#!/bin/sh
-[ -n "\${__V}" ] && set -x
-exec ${TARGET_OBJCOPY} \
-    "\$@"
-EOM
-chmod +x "${T}/${CONFIG_TARGET_TRIPLE}-objcopy"
-# TODO provide other usual tools? nm, ar, readelf, ...?
 
 echo -n "${prog_NAME}: Enabled bindings:"
 [ -n "${CONFIG_HVT}" ]    && echo -n " hvt"
@@ -561,9 +425,11 @@ CONFIG_MUEN=${CONFIG_MUEN}
 CONFIG_XEN=${CONFIG_XEN}
 CONFIG_TARGET_ARCH=${CONFIG_TARGET_ARCH}
 CONFIG_TARGET_TRIPLE=${CONFIG_TARGET_TRIPLE}
-CONFIG_TARGET_CC=${CONFIG_TARGET_TRIPLE}-cc
-CONFIG_TARGET_LD=${CONFIG_TARGET_TRIPLE}-ld
-CONFIG_TARGET_OBJCOPY=${CONFIG_TARGET_TRIPLE}-objcopy
+CONFIG_TARGET_CC=${TARGET_CC}
+CONFIG_TARGET_CC_CFLAGS=${CONFIG_TARGET_CC_EXTRA_CFLAGS}
+CONFIG_TARGET_LD=${TARGET_LD}
+CONFIG_TARGET_LD_MAX_PAGE_SIZE=${CONFIG_TARGET_LD_MAX_PAGE_SIZE}
+CONFIG_TARGET_OBJCOPY=${TARGET_OBJCOPY}
 EOM
 
 #

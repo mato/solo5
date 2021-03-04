@@ -7,6 +7,7 @@ Makeconf.sh
 tags
 include/crt
 include/version.h
+tests/*/*.stub
 tests/*/*.hvt
 tests/*/*.spt
 tests/*/*.virtio
@@ -19,5 +20,7 @@ tenders/hvt/solo5-hvt-debug
 tenders/spt/solo5-spt
 elftool/solo5-elftool
 opam/release
-toolchain/
+toolchain/bin/
+toolchain/include/
+toolchain/lib/
 solo5-*.tar.gz

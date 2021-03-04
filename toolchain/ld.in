@@ -1,0 +1,23 @@
+#!/bin/sh
+L="$(dirname $0)/../lib/@@CONFIG_TARGET_TRIPLE@@"
+[ ! -d "${L}" ] && echo "$0: Could not determine library path" 1>&2 && exit 1
+B=
+for arg do
+    shift
+    case "$arg" in
+        --solo5-abi=*)
+            B="${arg##*=}"
+            continue
+        ;;
+    esac
+    set -- "$@" "$arg"
+done
+[ -n "${B}" ] && B="-T solo5_${B}.lds -l :solo5_${B}.o"
+[ -n "${__V}" ] && set -x
+exec @@CONFIG_TARGET_LD@@ \
+    -nostdlib \
+    -L ${L} \
+    -z max-page-size=@@CONFIG_TARGET_LD_MAX_PAGE_SIZE@@ \
+    -static \
+    ${B} \
+    "$@"

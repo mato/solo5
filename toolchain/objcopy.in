@@ -1,0 +1,4 @@
+#!/bin/sh
+[ -n "${__V}" ] && set -x
+exec @@CONFIG_TARGET_OBJCOPY@@ \
+    "$@"

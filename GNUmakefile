@@ -21,7 +21,9 @@ $(TOPDIR)/Makeconf:
 	$(error Makeconf not found, please run ./configure.sh)
 include Makefile.common
 
-SUBDIRS := bindings tenders elftool tests
+SUBDIRS := toolchain bindings tenders elftool tests
+
+bindings: toolchain
 
 tests: bindings elftool
 
@@ -78,8 +80,6 @@ clean: $(SUBDIRS)
 distclean: MAKECMDGOALS := clean
 distclean: clean
 	@echo DISTCLEAN solo5
-	-[ -d include/crt ] && $(RM) -r include/crt
-	-[ -d toolchain/ ] && $(RM) -r toolchain
 	$(RM) Makeconf Makeconf.sh
 
 DESTDIR ?=

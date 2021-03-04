@@ -29,12 +29,12 @@ include $(TOPDIR)/Makeconf
 # The following variables and recipes apply to building bindings for each
 # target.
 #
-CC := __V=$(V) $(TOPDIR)/toolchain/bin/$(CONFIG_TARGET_CC)
+CC := __V=$(V) $(TOPDIR)/toolchain/bin/$(CONFIG_TARGET_TRIPLE)-cc
 CFLAGS := -std=c11 -Wall -Wextra -Werror -O2 -g
 CPPFLAGS :=
-LD := __V=$(V) $(TOPDIR)/toolchain/bin/$(CONFIG_TARGET_LD)
+LD := __V=$(V) $(TOPDIR)/toolchain/bin/$(CONFIG_TARGET_TRIPLE)-ld
 LDFLAGS :=
-OBJCOPY := __V=$(V) $(TOPDIR)/toolchain/bin/$(CONFIG_TARGET_OBJCOPY)
+OBJCOPY := __V=$(V) $(TOPDIR)/toolchain/bin/$(CONFIG_TARGET_TRIPLE)-objcopy
 
 # Also used by the HOST_ rules below.
 DEPFLAGS = -MT $@ -MMD -MP -MF $*.Td
