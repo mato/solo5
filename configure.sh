@@ -394,8 +394,8 @@ fi
 echo "${prog_NAME}: Using ${TARGET_LD} for target linker"
 echo "${prog_NAME}: Using ${TARGET_OBJCOPY} for target objcopy"
 
-CONFIG_TARGET_SPEC="${CONFIG_TARGET_ARCH}-solo5-none-static"
-echo "${prog_NAME}: Target toolchain spec is ${CONFIG_TARGET_SPEC}"
+CONFIG_TARGET_TRIPLE="${CONFIG_TARGET_ARCH}-solo5-none-static"
+echo "${prog_NAME}: Target toolchain triple is ${CONFIG_TARGET_TRIPLE}"
 
 [ -d "$PWD/toolchain" ] && die "toolchain/ already exists, run make distclean"
 
@@ -410,7 +410,7 @@ ln -s ../../include $PWD/toolchain/include/solo5
 # CONFIG_LDFLAGS="${CONFIG_LDFLAGS} -nopie"
 
 TARGET_EXTRA_CFLAGS=
-CRT_INCDIR=$PWD/toolchain/include/${CONFIG_TARGET_SPEC}
+CRT_INCDIR=$PWD/toolchain/include/${CONFIG_TARGET_TRIPLE}
 mkdir -p ${CRT_INCDIR}
 case ${HOST_CC_MACHINE} in
     *linux*)
@@ -441,16 +441,16 @@ esac
 
 L="$PWD/toolchain/lib"
 mkdir -p ${L}
-ln -s ../../bindings ${L}/${CONFIG_TARGET_SPEC}
+ln -s ../../bindings ${L}/${CONFIG_TARGET_TRIPLE}
 
 # TODO generate these wrappers using a Makefile and sed, avoiding too many \s
 T="toolchain/bin"
 mkdir -p ${T}
-cat >"${T}/${CONFIG_TARGET_SPEC}-cc" <<EOM
+cat >"${T}/${CONFIG_TARGET_TRIPLE}-cc" <<EOM
 #!/bin/sh
 I="\$(dirname \$0)/../include"
 [ ! -d "\${I}" ] && echo "\$0: Could not determine include path" 1>&2 && exit 1
-L="\$(dirname \$0)/../lib/${CONFIG_TARGET_SPEC}"
+L="\$(dirname \$0)/../lib/${CONFIG_TARGET_TRIPLE}"
 [ ! -d "\${L}" ] && echo "\$0: Could not determine library path" 1>&2 && exit 1
 M=link
 B=stub
@@ -472,7 +472,7 @@ case \${M} in
         [ -n "\${__V}" ] && set -x
         exec ${TARGET_CC} \
             ${TARGET_EXTRA_CFLAGS} \
-            -isystem \${I}/${CONFIG_TARGET_SPEC} -I \${I}/solo5 \
+            -isystem \${I}/${CONFIG_TARGET_TRIPLE} -I \${I}/solo5 \
             -ffreestanding \
             -fstack-protector-strong \
             "\$@"
@@ -482,7 +482,7 @@ case \${M} in
         [ -n "\${__V}" ] && set -x
         exec ${TARGET_CC} \
             ${TARGET_EXTRA_CFLAGS} \
-            -isystem \${I}/${CONFIG_TARGET_SPEC} -I \${I}/solo5 \
+            -isystem \${I}/${CONFIG_TARGET_TRIPLE} -I \${I}/solo5 \
             -ffreestanding \
             -fstack-protector-strong \
             -nostdlib \
@@ -495,10 +495,10 @@ case \${M} in
         ;;
 esac
 EOM
-chmod +x "${T}/${CONFIG_TARGET_SPEC}-cc"
-cat >"${T}/${CONFIG_TARGET_SPEC}-ld" <<EOM
+chmod +x "${T}/${CONFIG_TARGET_TRIPLE}-cc"
+cat >"${T}/${CONFIG_TARGET_TRIPLE}-ld" <<EOM
 #!/bin/sh
-L="\$(dirname \$0)/../lib/${CONFIG_TARGET_SPEC}"
+L="\$(dirname \$0)/../lib/${CONFIG_TARGET_TRIPLE}"
 [ ! -d "\${L}" ] && echo "\$0: Could not determine library path" 1>&2 && exit 1
 B=
 for arg do
@@ -521,14 +521,14 @@ exec ${TARGET_LD} \
     \${B} \
     "\$@"
 EOM
-chmod +x "${T}/${CONFIG_TARGET_SPEC}-ld"
-cat >"${T}/${CONFIG_TARGET_SPEC}-objcopy" <<EOM
+chmod +x "${T}/${CONFIG_TARGET_TRIPLE}-ld"
+cat >"${T}/${CONFIG_TARGET_TRIPLE}-objcopy" <<EOM
 #!/bin/sh
 [ -n "\${__V}" ] && set -x
 exec ${TARGET_OBJCOPY} \
     "\$@"
 EOM
-chmod +x "${T}/${CONFIG_TARGET_SPEC}-objcopy"
+chmod +x "${T}/${CONFIG_TARGET_TRIPLE}-objcopy"
 # TODO provide other usual tools? nm, ar, readelf, ...?
 
 echo -n "${prog_NAME}: Enabled bindings:"
@@ -560,10 +560,10 @@ CONFIG_VIRTIO=${CONFIG_VIRTIO}
 CONFIG_MUEN=${CONFIG_MUEN}
 CONFIG_XEN=${CONFIG_XEN}
 CONFIG_TARGET_ARCH=${CONFIG_TARGET_ARCH}
-CONFIG_TARGET_SPEC=${CONFIG_TARGET_SPEC}
-CONFIG_TARGET_CC=${CONFIG_TARGET_SPEC}-cc
-CONFIG_TARGET_LD=${CONFIG_TARGET_SPEC}-ld
-CONFIG_TARGET_OBJCOPY=${CONFIG_TARGET_SPEC}-objcopy
+CONFIG_TARGET_TRIPLE=${CONFIG_TARGET_TRIPLE}
+CONFIG_TARGET_CC=${CONFIG_TARGET_TRIPLE}-cc
+CONFIG_TARGET_LD=${CONFIG_TARGET_TRIPLE}-ld
+CONFIG_TARGET_OBJCOPY=${CONFIG_TARGET_TRIPLE}-objcopy
 EOM
 
 #

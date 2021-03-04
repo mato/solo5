@@ -108,19 +108,19 @@ install-headers: build
 	mkdir -p $(D)/include/solo5
 	$(INSTALL) -m 0644 $(PUBLIC_HEADERS) $(D)/include/solo5
 
-TOOLCHAIN_INCDIR := $(D)/include/$(CONFIG_TARGET_SPEC)
-TOOLCHAIN_LIBDIR := $(D)/lib/$(CONFIG_TARGET_SPEC)
+TOOLCHAIN_INCDIR := $(D)/include/$(CONFIG_TARGET_TRIPLE)
+TOOLCHAIN_LIBDIR := $(D)/lib/$(CONFIG_TARGET_TRIPLE)
 
 .PHONY: install-toolchain
 install-toolchain: MAKECMDGOALS :=
 install-toolchain: build
 	@echo INSTALL toolchain
 	mkdir -p $(D)/bin
-	$(INSTALL) -m 0755 toolchain/bin/$(CONFIG_TARGET_SPEC)-cc $(D)/bin
-	$(INSTALL) -m 0755 toolchain/bin/$(CONFIG_TARGET_SPEC)-ld $(D)/bin
-	$(INSTALL) -m 0755 toolchain/bin/$(CONFIG_TARGET_SPEC)-objcopy $(D)/bin
+	$(INSTALL) -m 0755 toolchain/bin/$(CONFIG_TARGET_TRIPLE)-cc $(D)/bin
+	$(INSTALL) -m 0755 toolchain/bin/$(CONFIG_TARGET_TRIPLE)-ld $(D)/bin
+	$(INSTALL) -m 0755 toolchain/bin/$(CONFIG_TARGET_TRIPLE)-objcopy $(D)/bin
 	mkdir -p $(TOOLCHAIN_INCDIR) $(TOOLCHAIN_LIBDIR)
-	cd toolchain/include/$(CONFIG_TARGET_SPEC) && \
+	cd toolchain/include/$(CONFIG_TARGET_TRIPLE) && \
 	    find . -type d -exec mkdir -p "$(TOOLCHAIN_INCDIR)/{}" \; && \
 	    find . -type f -name '*.h' -exec $(INSTALL) -m 0644 \
 	    "{}" "$(TOOLCHAIN_INCDIR)/{}" \;
