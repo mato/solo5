@@ -395,12 +395,16 @@ case ${TARGET_CC_MACHINE} in
         ;;
 esac
 
-echo -n "${prog_NAME}: Enabled bindings:"
+echo -n "${prog_NAME}: Enabled bindings: stub"
 [ -n "${CONFIG_HVT}" ]    && echo -n " hvt"
 [ -n "${CONFIG_SPT}" ]    && echo -n " spt"
 [ -n "${CONFIG_VIRTIO}" ] && echo -n " virtio"
 [ -n "${CONFIG_MUEN}" ]   && echo -n " muen"
 [ -n "${CONFIG_XEN}" ]    && echo -n " xen"
+echo "."
+echo -n "${prog_NAME}: Enabled tenders:"
+[ -n "${CONFIG_HVT_TENDER}" ]    && echo -n " hvt"
+[ -n "${CONFIG_SPT_TENDER}" ]    && echo -n " spt"
 echo "."
 
 #
