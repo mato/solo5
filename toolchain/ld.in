@@ -1,14 +1,34 @@
 #!/bin/sh
 L="$(dirname $0)/../lib/@@CONFIG_TARGET_TRIPLE@@"
 [ ! -d "${L}" ] && echo "$0: Could not determine library path" 1>&2 && exit 1
+# ld accepts -z solo5-abi=ABI, but does not provide a default ABI
+# this is intentional
 B=
+Z=
 for arg do
     shift
+    if [ -n "${Z}" ]; then
+        # handle -z linker-arg
+        Z=
+        case "$arg" in
+            solo5-abi=*)
+                B="${arg##*=}"
+                continue
+                ;;
+            *)
+                set -- "$@" "-z" "$arg"
+                continue
+                ;;
+        esac
+    fi
+
     case "$arg" in
-        --solo5-abi=*)
-            B="${arg##*=}"
-            continue
-        ;;
+        -z)
+            if [ -z "${Z}" ]; then
+                Z=1
+                continue
+            fi
+            ;;
     esac
     set -- "$@" "$arg"
 done

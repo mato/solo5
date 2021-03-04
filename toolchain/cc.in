@@ -4,17 +4,36 @@ I="$(dirname $0)/../include"
 L="$(dirname $0)/../lib/@@CONFIG_TARGET_TRIPLE@@"
 [ ! -d "${L}" ] && echo "$0: Could not determine library path" 1>&2 && exit 1
 M=link
+# cc as linker with no -z solo5-abi= defaults to stub
 B=stub
+Z=
 for arg do
     shift
+    if [ -n "${Z}" ]; then
+        # handle -z linker-arg
+        Z=
+        case "$arg" in
+            solo5-abi=*)
+                B="${arg##*=}"
+                continue
+                ;;
+            *)
+                set -- "$@" "-z" "$arg"
+                continue
+                ;;
+        esac
+    fi
+
     case "$arg" in
         -c|-S|-E)
             M=compile
             ;;
-        --solo5-abi=*)
-            B="${arg##*=}"
-            continue
-        ;;
+        -z)
+            if [ -z "${Z}" ]; then
+                Z=1
+                continue
+            fi
+            ;;
     esac
     set -- "$@" "$arg"
 done
@@ -23,7 +42,8 @@ case ${M} in
         [ -n "${__V}" ] && set -x
         exec @@CONFIG_TARGET_CC@@ \
             @@CONFIG_TARGET_CC_CFLAGS@@ \
-            -isystem ${I}/@@CONFIG_TARGET_TRIPLE@@ -I ${I}/solo5 \
+            -isystem ${I}/@@CONFIG_TARGET_TRIPLE@@ \
+            -I ${I}/solo5 \
             -ffreestanding \
             -fstack-protector-strong \
             "$@"
@@ -33,7 +53,8 @@ case ${M} in
         [ -n "${__V}" ] && set -x
         exec @@CONFIG_TARGET_CC@@ \
             @@CONFIG_TARGET_CC_CFLAGS@@ \
-            -isystem ${I}/@@CONFIG_TARGET_TRIPLE@@ -I ${I}/solo5 \
+            -isystem ${I}/@@CONFIG_TARGET_TRIPLE@@ \
+            -I ${I}/solo5 \
             -ffreestanding \
             -fstack-protector-strong \
             -nostdlib \

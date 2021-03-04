@@ -46,7 +46,7 @@ all_TARGETS += $(test_NAME).stub
 ifdef CONFIG_HVT
 %.hvt: %.o manifest.o
 	@echo "CCLD $@"
-	$(CC) --solo5-abi=hvt $< manifest.o -o $@
+	$(CC) -z solo5-abi=hvt $< manifest.o -o $@
 
 all_TARGETS += $(test_NAME).hvt
 endif
@@ -54,7 +54,7 @@ endif
 ifdef CONFIG_SPT
 %.spt: %.o manifest.o
 	@echo "CCLD $@"
-	$(CC) --solo5-abi=spt $< manifest.o -o $@
+	$(CC) -z solo5-abi=spt $< manifest.o -o $@
 
 all_TARGETS += $(test_NAME).spt
 endif
@@ -62,7 +62,7 @@ endif
 ifdef CONFIG_VIRTIO
 %.virtio: %.o manifest.o
 	@echo "CCLD $@"
-	$(CC) --solo5-abi=virtio $< manifest.o -o $@
+	$(CC) -z solo5-abi=virtio $< manifest.o -o $@
 
 all_TARGETS += $(test_NAME).virtio
 endif
@@ -70,7 +70,7 @@ endif
 ifdef CONFIG_MUEN
 %.muen: %.o manifest.o
 	@echo "CCLD $@"
-	$(CC) --solo5-abi=muen $< manifest.o -o $@
+	$(CC) -z solo5-abi=muen $< manifest.o -o $@
 
 all_TARGETS += $(test_NAME).muen
 endif
@@ -78,7 +78,7 @@ endif
 ifdef CONFIG_XEN
 %.xen: %.o manifest.o
 	@echo "CCLD $@"
-	$(CC) --solo5-abi=xen $< manifest.o -o $@
+	$(CC) -z solo5-abi=xen $< manifest.o -o $@
 
 %.xl: %.xen
 	@echo "SUBST $@"
