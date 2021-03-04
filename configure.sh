@@ -384,6 +384,11 @@ echo "${prog_NAME}: Target toolchain triple is ${CONFIG_TARGET_TRIPLE}"
 CONFIG_TARGET_CC_CFLAGS=
 if CC="${TARGET_CC}" cc_is_clang; then
     CONFIG_TARGET_CC_CFLAGS=-nostdlibinc
+    # XXX Clang warns for no good reason if -nostdlibinc is used and no
+    # compliation is performed. We could work around this by using --config
+    # which "claims" all command line arguments as "used", but this is easier
+    # for now.
+    CONFIG_TARGET_CC_CFLAGS="${CONFIG_TARGET_CC_CFLAGS} -Wno-unused-command-line-argument"
 else
     CONFIG_TARGET_CC_CFLAGS=-nostdinc
 fi
